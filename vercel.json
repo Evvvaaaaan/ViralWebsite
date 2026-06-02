@@ -1,7 +1,18 @@
 {
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "/percenteme",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/percenteme",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/percenteme/(.*)",
       "destination": "/index.html"
     }
   ]
