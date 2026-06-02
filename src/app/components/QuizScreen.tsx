@@ -1,43 +1,56 @@
-import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import type { Gender, QuizAnswer } from '../types';
-import { getQuestions } from '../data/questions';
-import { getCurrentOnlineUsers } from '../utils/engagement';
-import { Users } from 'lucide-react';
-import { logGAEvent } from '../utils/analytics';
-import { logUserEvent } from '../utils/apiClient';
+import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "motion/react";
+import type { Gender, QuizAnswer } from "../types";
+import {
+  getQuestionOptions,
+  getQuestionScore,
+  getQuestionText,
+  getQuestions,
+  type Question,
+} from "../data/questions";
+import { getCurrentOnlineUsers } from "../utils/engagement";
+import { Users, ChevronLeft } from "lucide-react";
+import { logGAEvent } from "../utils/analytics";
+import { logUserEvent } from "../utils/apiClient";
 
 interface QuizScreenProps {
   gender: Gender;
   ageGroup: string;
   onComplete: (answers: QuizAnswer[]) => void;
   initialAnswers: QuizAnswer[];
+  initialQuestionIndex?: number;
 }
 
 const categories = [
-  { name: '자기관리', range: [1, 5] },
-  { name: '경제력', range: [6, 10] },
-  { name: '사회성', range: [11, 15] },
-  { name: '라이프스타일', range: [16, 20] },
-  { name: '마인드셋', range: [21, 25] },
+  { name: "자기관리", range: [1, 5] },
+  { name: "마인드셋", range: [6, 10] },
+  { name: "경제력", range: [11, 15] },
+  { name: "사회성", range: [16, 20] },
+  { name: "라이프스타일", range: [21, 25] },
 ];
 
-export default function QuizScreen({ gender, ageGroup, onComplete, initialAnswers }: QuizScreenProps) {
-  const [currentQuestion, setCurrentQuestion] = useState(0);
+export default function QuizScreen({
+  gender,
+  ageGroup,
+  onComplete,
+  initialAnswers,
+  initialQuestionIndex = 0,
+}: QuizScreenProps) {
   const [answers, setAnswers] = useState<QuizAnswer[]>(initialAnswers);
+  const questionsList = getQuestions(ageGroup);
+  const [currentQuestion, setCurrentQuestion] = useState(() =>
+    Math.max(0, Math.min(initialQuestionIndex, questionsList.length - 1)),
+  );
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [socialFeedback, setSocialFeedback] = useState<string | null>(null);
   const [showSectionCard, setShowSectionCard] = useState(false);
   const [completedSection, setCompletedSection] = useState<number | null>(null);
-  const [direction, setDirection] = useState<'forward' | 'backward'>('forward');
+  const [direction, setDirection] = useState<"forward" | "backward">("forward");
   const [showExitWarning, setShowExitWarning] = useState(false);
   const [currentOnline, setCurrentOnline] = useState(0);
 
-  const questionsList = getQuestions(ageGroup);
   const question = questionsList[currentQuestion];
-  const options = question.genderSpecificOptions
-    ? (gender === 'male' ? question.genderSpecificOptions.male : question.genderSpecificOptions.female)
-    : question.options;
+  const options = getQuestionOptions(question, gender);
 
   // 동시 참여자 수 업데이트 (5초마다 변동)
   useEffect(() => {
@@ -45,7 +58,7 @@ export default function QuizScreen({ gender, ageGroup, onComplete, initialAnswer
     setCurrentOnline(Math.max(8, base));
 
     const interval = setInterval(() => {
-      setCurrentOnline(prev => {
+      setCurrentOnline((prev) => {
         // 보고서 명세: 5초마다 ±2~4 변동
         const variation = Math.floor(Math.random() * 7) - 2; // -2 ~ +4
         return Math.max(8, prev + variation);
@@ -58,7 +71,7 @@ export default function QuizScreen({ gender, ageGroup, onComplete, initialAnswer
   // 보고서 명세: 문항 번호에 따라 동적으로 변경되는 메시지
   const getConcurrentMessage = () => {
     const qNum = currentQuestion + 1;
-    
+
     if (qNum <= 5) {
       return `지금 ${currentOnline}명이 함께 시작했어요`;
     } else if (qNum <= 15) {
@@ -71,14 +84,19 @@ export default function QuizScreen({ gender, ageGroup, onComplete, initialAnswer
   };
 
   const isLightSection = Math.floor(currentQuestion / 5) % 2 === 0;
-  const bgColor = isLightSection ? 'var(--canvas)' : 'var(--surface-tile-1)';
-  const textColor = isLightSection ? 'var(--ink)' : 'var(--body-on-dark)';
-  const mutedColor = isLightSection ? 'var(--ink-muted-48)' : 'var(--body-muted)';
+  const bgColor = isLightSection ? "var(--canvas)" : "var(--surface-tile-1)";
+  const textColor = isLightSection ? "var(--ink)" : "var(--body-on-dark)";
+  const mutedColor = isLightSection
+    ? "var(--ink-muted-48)"
+    : "var(--body-muted)";
 
   // Save session
   useEffect(() => {
     if (answers.length > 0) {
-      localStorage.setItem('quiz-session', JSON.stringify({ answers, currentQuestion, gender, ageGroup }));
+      localStorage.setItem(
+        "quiz-session",
+        JSON.stringify({ answers, currentQuestion, gender, ageGroup }),
+      );
     }
   }, [answers, currentQuestion, gender, ageGroup]);
 
@@ -87,24 +105,24 @@ export default function QuizScreen({ gender, ageGroup, onComplete, initialAnswer
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (currentQuestion >= 5) {
         e.preventDefault();
-        e.returnValue = '';
+        e.returnValue = "";
       }
     };
 
     const handlePopState = () => {
       if (currentQuestion >= 5) {
         setShowExitWarning(true);
-        window.history.pushState(null, '', window.location.href);
+        window.history.pushState(null, "", window.location.href);
       }
     };
 
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    window.addEventListener('popstate', handlePopState);
-    window.history.pushState(null, '', window.location.href);
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    window.addEventListener("popstate", handlePopState);
+    window.history.pushState(null, "", window.location.href);
 
     return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      window.removeEventListener("popstate", handlePopState);
     };
   }, [currentQuestion]);
 
@@ -114,9 +132,18 @@ export default function QuizScreen({ gender, ageGroup, onComplete, initialAnswer
     const [start, end] = categories[catIndex].range;
     const questionsInCategory = end - start + 1;
     const answeredInCategory = answers.filter(
-      a => a.questionId >= start && a.questionId <= end
+      (a) => a.questionId >= start && a.questionId <= end,
     ).length;
     return (answeredInCategory / questionsInCategory) * 100;
+  };
+
+  const handleGoBack = () => {
+    if (currentQuestion === 0 || selectedOption !== null || showSectionCard)
+      return;
+    const prevQuestion = questionsList[currentQuestion - 1];
+    setAnswers((prev) => prev.filter((a) => a.questionId !== prevQuestion.id));
+    setDirection("backward");
+    setCurrentQuestion((prev) => prev - 1);
   };
 
   const handleAnswer = (optionIndex: number) => {
@@ -125,8 +152,11 @@ export default function QuizScreen({ gender, ageGroup, onComplete, initialAnswer
     setSelectedOption(optionIndex);
 
     const qNum = currentQuestion + 1;
-    logGAEvent(`question_${qNum}_answered`, 'quiz_flow', `Question ${qNum}`);
-    logUserEvent('question_answered', { questionNumber: qNum, answerIndex: optionIndex });
+    logGAEvent(`question_${qNum}_answered`, "quiz_flow", `Question ${qNum}`);
+    logUserEvent("question_answered", {
+      questionNumber: qNum,
+      answerIndex: optionIndex,
+    });
 
     // Social feedback after 350ms
     setTimeout(() => {
@@ -134,16 +164,16 @@ export default function QuizScreen({ gender, ageGroup, onComplete, initialAnswer
       const isPopular = percentage > 50;
       setSocialFeedback(
         isPopular
-          ? `⬆ 응답자 ${percentage}%도 같은 선택`
-          : `↓ 상위 ${100 - percentage}%만 이 답 선택`
+          ? `↑ 응답자 ${percentage}%도 같은 선택`
+          : `↓ 상위 ${100 - percentage}%만 이 답 선택`,
       );
     }, 350);
 
     // Auto-advance after 1000ms (Increased to give more reading time)
     setTimeout(() => {
-      const score = question.isReverse ? (optionIndex + 1) : (5 - optionIndex);
+      const score = getQuestionScore(question, optionIndex, gender);
       const newAnswers = [
-        ...answers.filter(a => a.questionId !== question.id),
+        ...answers.filter((a) => a.questionId !== question.id),
         { questionId: question.id, answer: score },
       ];
       setAnswers(newAnswers);
@@ -161,14 +191,14 @@ export default function QuizScreen({ gender, ageGroup, onComplete, initialAnswer
           // Auto-advance to next question after 2.5s
           setTimeout(() => {
             setShowSectionCard(false);
-            setDirection('forward');
-            setCurrentQuestion(prev => prev + 1);
+            setDirection("forward");
+            setCurrentQuestion((prev) => prev + 1);
           }, 2500);
         } else {
           setSelectedOption(null);
           setSocialFeedback(null);
-          setDirection('forward');
-          setCurrentQuestion(prev => prev + 1);
+          setDirection("forward");
+          setCurrentQuestion((prev) => prev + 1);
         }
       } else {
         onComplete(newAnswers);
@@ -178,19 +208,33 @@ export default function QuizScreen({ gender, ageGroup, onComplete, initialAnswer
 
   return (
     <div
-      className="w-full min-h-screen flex flex-col overflow-hidden transition-colors duration-700"
+      className="w-full min-h-dvh flex flex-col transition-colors duration-700"
       style={{ background: bgColor }}
     >
       {/* Segmented Progress Bar */}
       <div
-        className="sticky top-0 px-6 pt-8 pb-6 z-10"
+        className="sticky top-0 px-6 pt-4 pb-4 z-10"
         style={{ background: bgColor }}
       >
+        {currentQuestion > 0 && !showSectionCard && (
+          <motion.button
+            initial={{ opacity: 0 }}
+            animate={{ opacity: selectedOption !== null ? 0 : 1 }}
+            onClick={handleGoBack}
+            disabled={selectedOption !== null}
+            className="mb-4 flex items-center gap-1 text-[13px] transition-opacity"
+            style={{ color: mutedColor }}
+          >
+            <ChevronLeft size={15} strokeWidth={2} />
+            이전 질문
+          </motion.button>
+        )}
         <div className="flex gap-1">
           {categories.map((cat, idx) => {
             const [start, end] = cat.range;
             const isCompleted = currentQuestion >= end;
-            const isCurrent = currentQuestion >= start - 1 && currentQuestion < end;
+            const isCurrent =
+              currentQuestion >= start - 1 && currentQuestion < end;
             const progress = getCategoryProgress(idx);
 
             return (
@@ -201,23 +245,33 @@ export default function QuizScreen({ gender, ageGroup, onComplete, initialAnswer
                   ) : isCurrent ? (
                     <span style={{ color: textColor }}>{cat.name}</span>
                   ) : (
-                    <span style={{ color: mutedColor, opacity: 0.5 }}>{cat.name}</span>
+                    <span style={{ color: mutedColor, opacity: 0.5 }}>
+                      {cat.name}
+                    </span>
                   )}
                 </div>
                 <div
                   className="h-2 rounded-full overflow-hidden"
                   style={{
-                    background: isLightSection ? 'rgba(0, 0, 0, 0.1)' : 'rgba(255, 255, 255, 0.1)',
+                    background: isLightSection
+                      ? "rgba(0, 0, 0, 0.1)"
+                      : "rgba(255, 255, 255, 0.1)",
                   }}
                 >
                   <motion.div
                     className="h-full rounded-full"
                     style={{
-                      background: isCompleted || isCurrent ? 'var(--action-blue)' : 'transparent',
+                      background:
+                        isCompleted || isCurrent
+                          ? "var(--action-blue)"
+                          : "transparent",
                       width: `${progress}%`,
                     }}
                     animate={{
-                      scale: isCompleted && currentQuestion === end ? [1, 1.05, 1] : 1,
+                      scale:
+                        isCompleted && currentQuestion === end
+                          ? [1, 1.05, 1]
+                          : 1,
                     }}
                     transition={{ duration: 0.3 }}
                   />
@@ -229,7 +283,7 @@ export default function QuizScreen({ gender, ageGroup, onComplete, initialAnswer
       </div>
 
       {/* Question Area */}
-      <div className="flex-1 flex items-center justify-center px-6 py-20 overflow-hidden">
+      <div className="flex-1 flex items-center justify-center px-6 py-6 overflow-hidden">
         <div className="max-w-[640px] w-full">
           <AnimatePresence mode="wait">
             {showSectionCard && completedSection !== null ? (
@@ -246,6 +300,7 @@ export default function QuizScreen({ gender, ageGroup, onComplete, initialAnswer
                 question={question}
                 questionNumber={currentQuestion + 1}
                 totalQuestions={questionsList.length}
+                gender={gender}
                 options={options}
                 selectedOption={selectedOption}
                 socialFeedback={socialFeedback}
@@ -264,11 +319,11 @@ export default function QuizScreen({ gender, ageGroup, onComplete, initialAnswer
       <AnimatePresence>
         {showExitWarning && (
           <ExitWarningModal
-            progress={currentQuestion + 1}
+            progress={answers.length}
             onContinue={() => setShowExitWarning(false)}
             onExit={() => {
-              localStorage.removeItem('quiz-session');
-              window.location.href = '/';
+              localStorage.removeItem("quiz-session");
+              window.location.href = "/";
             }}
           />
         )}
@@ -281,9 +336,9 @@ export default function QuizScreen({ gender, ageGroup, onComplete, initialAnswer
         transition={{ delay: 0.5 }}
         className="fixed bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-full flex items-center gap-2"
         style={{
-          background: 'rgba(0, 0, 0, 0.6)',
-          border: '1px solid rgba(255, 255, 255, 0.2)',
-          backdropFilter: 'blur(16px)',
+          background: "rgba(0, 0, 0, 0.6)",
+          border: "1px solid rgba(255, 255, 255, 0.2)",
+          backdropFilter: "blur(16px)",
         }}
       >
         <Users size={14} strokeWidth={2} className="text-blue-400" />
@@ -296,14 +351,15 @@ export default function QuizScreen({ gender, ageGroup, onComplete, initialAnswer
 }
 
 interface QuestionCardProps {
-  question: any;
+  question: Question;
   questionNumber: number;
   totalQuestions: number;
+  gender: Gender;
   options: string[];
   selectedOption: number | null;
   socialFeedback: string | null;
   onAnswer: (index: number) => void;
-  direction: 'forward' | 'backward';
+  direction: "forward" | "backward";
   isLightSection: boolean;
   textColor: string;
   mutedColor: string;
@@ -313,6 +369,7 @@ function QuestionCard({
   question,
   questionNumber,
   totalQuestions,
+  gender,
   options,
   selectedOption,
   socialFeedback,
@@ -324,6 +381,7 @@ function QuestionCard({
 }: QuestionCardProps) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [localSelected, setLocalSelected] = useState<number | null>(null);
+  const questionText = getQuestionText(question, gender);
 
   useEffect(() => {
     setLocalSelected(selectedOption);
@@ -336,8 +394,8 @@ function QuestionCard({
   };
 
   const renderContent = () => {
-    if (question.type === 'scale') {
-      if (question.scaleType === 'grid') {
+    if (question.type === "scale") {
+      if (question.scaleType === "grid") {
         return (
           <div className="grid grid-cols-2 gap-3 sm:gap-4">
             {options.map((option: string, index: number) => (
@@ -350,19 +408,22 @@ function QuestionCard({
                 style={{
                   background:
                     selectedOption === index
-                      ? 'var(--action-blue)'
+                      ? "var(--action-blue)"
                       : isLightSection
-                      ? 'var(--canvas-parchment)'
-                      : 'rgba(255, 255, 255, 0.05)',
+                        ? "var(--canvas-parchment)"
+                        : "rgba(255, 255, 255, 0.05)",
                   border:
                     selectedOption === index
-                      ? 'none'
+                      ? "none"
                       : isLightSection
-                      ? '1px solid var(--hairline)'
-                      : '1px solid rgba(255, 255, 255, 0.1)',
-                  borderRadius: 'var(--rounded-lg)',
-                  cursor: selectedOption === null ? 'pointer' : 'default',
-                  opacity: selectedOption !== null && selectedOption !== index ? 0.3 : 1,
+                        ? "1px solid var(--hairline)"
+                        : "1px solid rgba(255, 255, 255, 0.1)",
+                  borderRadius: "var(--rounded-lg)",
+                  cursor: selectedOption === null ? "pointer" : "default",
+                  opacity:
+                    selectedOption !== null && selectedOption !== index
+                      ? 0.3
+                      : 1,
                 }}
               >
                 <div className="flex flex-col gap-3 relative z-10">
@@ -371,24 +432,24 @@ function QuestionCard({
                     style={{
                       background:
                         selectedOption === index
-                          ? 'rgba(255, 255, 255, 0.3)'
+                          ? "rgba(255, 255, 255, 0.3)"
                           : isLightSection
-                          ? 'var(--divider-soft)'
-                          : 'rgba(255, 255, 255, 0.1)',
-                      fontSize: '12px',
+                            ? "var(--divider-soft)"
+                            : "rgba(255, 255, 255, 0.1)",
+                      fontSize: "12px",
                       fontWeight: 600,
-                      color: selectedOption === index ? '#ffffff' : mutedColor,
+                      color: selectedOption === index ? "#ffffff" : mutedColor,
                     }}
                   >
-                    {selectedOption === index ? '✓' : index + 1}
+                    {selectedOption === index ? "✓" : index + 1}
                   </div>
                   <span
                     style={{
-                      fontSize: '16px',
+                      fontSize: "16px",
                       fontWeight: 400,
                       lineHeight: 1.35,
-                      letterSpacing: '-0.3px',
-                      color: selectedOption === index ? '#ffffff' : textColor,
+                      letterSpacing: "-0.3px",
+                      color: selectedOption === index ? "#ffffff" : textColor,
                     }}
                   >
                     {option}
@@ -411,9 +472,10 @@ function QuestionCard({
         );
       }
 
-      if (question.scaleType === 'slider') {
+      if (question.scaleType === "slider") {
         const stepPercent = 100 / (options.length - 1);
-        const activePercent = localSelected !== null ? localSelected * stepPercent : 0;
+        const activePercent =
+          localSelected !== null ? localSelected * stepPercent : 0;
 
         return (
           <div className="w-full flex flex-col items-center">
@@ -432,7 +494,10 @@ function QuestionCard({
                   {options[hoveredIndex]}
                 </div>
               ) : (
-                <div className="text-[13px] sm:text-[14px]" style={{ color: mutedColor }}>
+                <div
+                  className="text-[13px] sm:text-[14px]"
+                  style={{ color: mutedColor }}
+                >
                   원하는 지점을 선택하세요
                 </div>
               )}
@@ -444,7 +509,9 @@ function QuestionCard({
               <div
                 className="w-full h-1.5 rounded-full"
                 style={{
-                  background: isLightSection ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.1)',
+                  background: isLightSection
+                    ? "rgba(0, 0, 0, 0.08)"
+                    : "rgba(255, 255, 255, 0.1)",
                 }}
               />
               {/* Active/Filled Track */}
@@ -452,7 +519,7 @@ function QuestionCard({
                 className="absolute top-1/2 -translate-y-1/2 left-0 h-1.5 rounded-full bg-gradient-to-r from-blue-600 to-blue-400 shadow-[0_0_10px_rgba(0,102,204,0.3)]"
                 initial={{ width: 0 }}
                 animate={{ width: `${activePercent}%` }}
-                transition={{ type: 'spring', stiffness: 120, damping: 20 }}
+                transition={{ type: "spring", stiffness: 120, damping: 20 }}
               />
               {/* Steps Nodes */}
               {options.map((opt: string, idx: number) => {
@@ -472,16 +539,18 @@ function QuestionCard({
                       className="w-5 h-5 rounded-full border-2 transition-colors duration-200 cursor-pointer"
                       style={{
                         background: isStepSelected
-                          ? '#ffffff'
+                          ? "#ffffff"
                           : isLightSection
-                          ? 'var(--canvas)'
-                          : 'var(--cosmic-base)',
+                            ? "var(--canvas)"
+                            : "var(--cosmic-base)",
                         borderColor: isStepSelected
-                          ? 'var(--action-blue)'
+                          ? "var(--action-blue)"
                           : isLightSection
-                          ? 'rgba(0, 0, 0, 0.2)'
-                          : 'rgba(255, 255, 255, 0.3)',
-                        boxShadow: isStepSelected ? '0 0 12px var(--action-blue)' : 'none',
+                            ? "rgba(0, 0, 0, 0.2)"
+                            : "rgba(255, 255, 255, 0.3)",
+                        boxShadow: isStepSelected
+                          ? "0 0 12px var(--action-blue)"
+                          : "none",
                       }}
                       whileHover={{ scale: selectedOption === null ? 1.25 : 1 }}
                       animate={{
@@ -503,16 +572,19 @@ function QuestionCard({
                     disabled={selectedOption !== null}
                     onClick={() => handleSliderSelect(idx)}
                     className="text-center focus:outline-none flex flex-col items-center group cursor-pointer"
-                    style={{ opacity: selectedOption !== null && !isStepSelected ? 0.35 : 1 }}
+                    style={{
+                      opacity:
+                        selectedOption !== null && !isStepSelected ? 0.35 : 1,
+                    }}
                   >
                     <span
                       className="text-[11px] sm:text-[13px] leading-snug font-normal transition-colors duration-200"
                       style={{
                         color: isStepSelected
-                          ? 'var(--action-blue)'
+                          ? "var(--action-blue)"
                           : isLightSection
-                          ? 'var(--ink)'
-                          : 'rgba(255, 255, 255, 0.65)',
+                            ? "var(--ink)"
+                            : "rgba(255, 255, 255, 0.65)",
                         fontWeight: isStepSelected ? 600 : 400,
                       }}
                     >
@@ -530,8 +602,12 @@ function QuestionCard({
                   animate={{ opacity: 1, y: 0 }}
                   className="text-[13px] font-normal text-center mt-6 px-4 py-1.5 rounded-full"
                   style={{
-                    color: isLightSection ? 'var(--action-blue)' : 'var(--body-on-dark)',
-                    background: isLightSection ? 'var(--canvas-parchment)' : 'rgba(255, 255, 255, 0.05)',
+                    color: isLightSection
+                      ? "var(--action-blue)"
+                      : "var(--body-on-dark)",
+                    background: isLightSection
+                      ? "var(--canvas-parchment)"
+                      : "rgba(255, 255, 255, 0.05)",
                   }}
                 >
                   {socialFeedback}
@@ -542,14 +618,16 @@ function QuestionCard({
         );
       }
 
-      if (question.scaleType === 'list') {
+      if (question.scaleType === "list") {
         return (
           <div className="relative pl-8 space-y-4">
             {/* Connecting line */}
             <div
               className="absolute left-[11px] top-4 bottom-4 w-0.5"
               style={{
-                background: isLightSection ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.1)',
+                background: isLightSection
+                  ? "rgba(0, 0, 0, 0.08)"
+                  : "rgba(255, 255, 255, 0.1)",
               }}
             />
             {/* Active filling line */}
@@ -560,16 +638,17 @@ function QuestionCard({
                 animate={{
                   height: `${(selectedOption / (options.length - 1)) * 100}%`,
                 }}
-                transition={{ duration: 0.5, ease: 'easeInOut' }}
+                transition={{ duration: 0.5, ease: "easeInOut" }}
                 style={{
-                  maxHeight: 'calc(100% - 32px)',
+                  maxHeight: "calc(100% - 32px)",
                 }}
               />
             )}
 
             {options.map((option: string, index: number) => {
               const isStepSelected = selectedOption === index;
-              const isFilled = selectedOption !== null && index <= selectedOption;
+              const isFilled =
+                selectedOption !== null && index <= selectedOption;
 
               return (
                 <motion.div
@@ -582,20 +661,21 @@ function QuestionCard({
                     className="absolute -left-[29px] top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 z-10 transition-all duration-300"
                     style={{
                       background: isStepSelected
-                        ? '#ffffff'
+                        ? "#ffffff"
                         : isFilled
-                        ? 'var(--action-blue)'
-                        : isLightSection
-                        ? 'var(--canvas)'
-                        : 'var(--cosmic-base)',
-                      borderColor: isFilled || isStepSelected
-                        ? 'var(--action-blue)'
-                        : isLightSection
-                        ? 'rgba(0, 0, 0, 0.2)'
-                        : 'rgba(255, 255, 255, 0.3)',
+                          ? "var(--action-blue)"
+                          : isLightSection
+                            ? "var(--canvas)"
+                            : "var(--cosmic-base)",
+                      borderColor:
+                        isFilled || isStepSelected
+                          ? "var(--action-blue)"
+                          : isLightSection
+                            ? "rgba(0, 0, 0, 0.2)"
+                            : "rgba(255, 255, 255, 0.3)",
                       boxShadow: isStepSelected
-                        ? '0 0 10px var(--action-blue)'
-                        : 'none',
+                        ? "0 0 10px var(--action-blue)"
+                        : "none",
                     }}
                   />
 
@@ -606,25 +686,26 @@ function QuestionCard({
                     className="w-full text-left px-5 py-4 transition-all duration-200 relative overflow-hidden"
                     style={{
                       background: isStepSelected
-                        ? 'var(--action-blue)'
+                        ? "var(--action-blue)"
                         : isLightSection
-                        ? 'var(--canvas-parchment)'
-                        : 'rgba(255, 255, 255, 0.04)',
+                          ? "var(--canvas-parchment)"
+                          : "rgba(255, 255, 255, 0.04)",
                       border: isStepSelected
-                        ? 'none'
+                        ? "none"
                         : isLightSection
-                        ? '1px solid var(--hairline)'
-                        : '1px solid rgba(255, 255, 255, 0.08)',
-                      borderRadius: 'var(--rounded-lg)',
-                      cursor: selectedOption === null ? 'pointer' : 'default',
-                      opacity: selectedOption !== null && !isStepSelected ? 0.35 : 1,
+                          ? "1px solid var(--hairline)"
+                          : "1px solid rgba(255, 255, 255, 0.08)",
+                      borderRadius: "var(--rounded-lg)",
+                      cursor: selectedOption === null ? "pointer" : "default",
+                      opacity:
+                        selectedOption !== null && !isStepSelected ? 0.35 : 1,
                     }}
                   >
                     <div className="flex items-center gap-4 relative z-10">
                       <div
                         className="text-[12px] font-semibold flex-shrink-0"
                         style={{
-                          color: isStepSelected ? '#ffffff' : mutedColor,
+                          color: isStepSelected ? "#ffffff" : mutedColor,
                         }}
                       >
                         단계 {index + 1}
@@ -632,9 +713,9 @@ function QuestionCard({
                       <div className="flex-1">
                         <span
                           style={{
-                            fontSize: '16px',
+                            fontSize: "16px",
                             fontWeight: 400,
-                            color: isStepSelected ? '#ffffff' : textColor,
+                            color: isStepSelected ? "#ffffff" : textColor,
                           }}
                         >
                           {option}
@@ -675,19 +756,20 @@ function QuestionCard({
             style={{
               background:
                 selectedOption === index
-                  ? 'var(--action-blue)'
+                  ? "var(--action-blue)"
                   : isLightSection
-                  ? 'var(--canvas-parchment)'
-                  : 'rgba(255, 255, 255, 0.05)',
+                    ? "var(--canvas-parchment)"
+                    : "rgba(255, 255, 255, 0.05)",
               border:
                 selectedOption === index
-                  ? 'none'
+                  ? "none"
                   : isLightSection
-                  ? '1px solid var(--hairline)'
-                  : '1px solid rgba(255, 255, 255, 0.1)',
-              borderRadius: 'var(--rounded-lg)',
-              cursor: selectedOption === null ? 'pointer' : 'default',
-              opacity: selectedOption !== null && selectedOption !== index ? 0.3 : 1,
+                    ? "1px solid var(--hairline)"
+                    : "1px solid rgba(255, 255, 255, 0.1)",
+              borderRadius: "var(--rounded-lg)",
+              cursor: selectedOption === null ? "pointer" : "default",
+              opacity:
+                selectedOption !== null && selectedOption !== index ? 0.3 : 1,
             }}
           >
             <AnimatePresence>
@@ -697,7 +779,7 @@ function QuestionCard({
                   animate={{ scale: 2, opacity: 0 }}
                   transition={{ duration: 0.4 }}
                   className="absolute inset-0 rounded-[18px]"
-                  style={{ background: 'var(--action-blue)' }}
+                  style={{ background: "var(--action-blue)" }}
                 />
               )}
             </AnimatePresence>
@@ -708,25 +790,25 @@ function QuestionCard({
                 style={{
                   background:
                     selectedOption === index
-                      ? 'rgba(255, 255, 255, 0.3)'
+                      ? "rgba(255, 255, 255, 0.3)"
                       : isLightSection
-                      ? 'var(--divider-soft)'
-                      : 'rgba(255, 255, 255, 0.1)',
-                  fontSize: '12px',
+                        ? "var(--divider-soft)"
+                        : "rgba(255, 255, 255, 0.1)",
+                  fontSize: "12px",
                   fontWeight: 600,
-                  color: selectedOption === index ? '#ffffff' : mutedColor,
+                  color: selectedOption === index ? "#ffffff" : mutedColor,
                 }}
               >
-                {selectedOption === index ? '✓' : index + 1}
+                {selectedOption === index ? "✓" : index + 1}
               </div>
               <div className="flex-1">
                 <span
                   style={{
-                    fontSize: '17px',
+                    fontSize: "17px",
                     fontWeight: 400,
                     lineHeight: 1.47,
-                    letterSpacing: '-0.374px',
-                    color: selectedOption === index ? '#ffffff' : textColor,
+                    letterSpacing: "-0.374px",
+                    color: selectedOption === index ? "#ffffff" : textColor,
                   }}
                 >
                   {option}
@@ -739,8 +821,8 @@ function QuestionCard({
                       animate={{ opacity: 1, y: 0 }}
                       className="mt-2"
                       style={{
-                        fontSize: '13px',
-                        color: 'rgba(255, 255, 255, 0.8)',
+                        fontSize: "13px",
+                        color: "rgba(255, 255, 255, 0.8)",
                       }}
                     >
                       {socialFeedback}
@@ -757,32 +839,32 @@ function QuestionCard({
 
   return (
     <motion.div
-      initial={{ opacity: 0, x: direction === 'forward' ? 40 : -40 }}
+      initial={{ opacity: 0, x: direction === "forward" ? 40 : -40 }}
       animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: direction === 'forward' ? -40 : 40 }}
+      exit={{ opacity: 0, x: direction === "forward" ? -40 : 40 }}
       transition={{ duration: 0.3, ease: [0.4, 0.0, 0.2, 1] }}
     >
       <div
         className="mb-6"
         style={{
-          fontSize: '14px',
+          fontSize: "14px",
           color: mutedColor,
-          letterSpacing: '-0.224px',
+          letterSpacing: "-0.224px",
         }}
       >
         질문 {questionNumber} / {totalQuestions} · {question.category}
       </div>
 
       <h2
-        className="mb-12"
+        className="mb-6"
         style={{
-          fontSize: 'clamp(24px, 5vw, 40px)',
+          fontSize: "clamp(24px, 5vw, 40px)",
           fontWeight: 600,
           lineHeight: 1.1,
           color: textColor,
         }}
       >
-        {question.question}
+        {questionText}
       </h2>
 
       {renderContent()}
@@ -797,7 +879,12 @@ interface SectionCompletionCardProps {
   mutedColor: string;
 }
 
-function SectionCompletionCard({ section, currentQuestion, textColor, mutedColor }: SectionCompletionCardProps) {
+function SectionCompletionCard({
+  section,
+  currentQuestion,
+  textColor,
+  mutedColor,
+}: SectionCompletionCardProps) {
   const isHalfway = currentQuestion === 15;
 
   return (
@@ -814,13 +901,13 @@ function SectionCompletionCard({ section, currentQuestion, textColor, mutedColor
         transition={{ duration: 0.5, times: [0, 0.6, 1] }}
         className="text-[64px] mb-6"
       >
-        {isHalfway ? '🎯' : '✓'}
+        {isHalfway ? "🎯" : "✓"}
       </motion.div>
 
       <h2
         className="mb-4"
         style={{
-          fontSize: '40px',
+          fontSize: "40px",
           fontWeight: 600,
           lineHeight: 1.1,
           color: textColor,
@@ -834,17 +921,29 @@ function SectionCompletionCard({ section, currentQuestion, textColor, mutedColor
           <p className="text-[21px] mb-4" style={{ color: textColor }}>
             벌써 절반!
           </p>
-          <p className="text-[17px] leading-relaxed" style={{ color: mutedColor }}>
+          <p
+            className="text-[17px] leading-relaxed"
+            style={{ color: mutedColor }}
+          >
             지금까지 15,847명 중 당신만큼
             <br />
             성실한 응답자는 23%입니다
           </p>
         </>
       ) : (
-        <p className="text-[17px] leading-relaxed" style={{ color: mutedColor }}>
-          지금까지 답변을 보면,
-          <br />
-          당신은 {section.name}형에 가깝네요
+        <p
+          className="text-[17px] leading-relaxed"
+          style={{ color: mutedColor }}
+        >
+          {(
+            {
+              자기관리: "자기관리에 대한 당신의 철학이 보여요",
+              마인드셋: "생각하는 방식과 태도를 살펴봤어요",
+              경제력: "돈을 대하는 태도가 드러났어요",
+              사회성: "사람을 대하는 온도가 느껴져요",
+              라이프스타일: "당신만의 생활 패턴이 있군요",
+            } as Record<string, string>
+          )[section.name] ?? "지금까지 답변을 잘 분석했어요"}
         </p>
       )}
 
@@ -852,9 +951,9 @@ function SectionCompletionCard({ section, currentQuestion, textColor, mutedColor
       <div className="mt-8 h-1 rounded-full bg-white/10 overflow-hidden max-w-xs mx-auto">
         <motion.div
           className="h-full rounded-full bg-blue-500"
-          initial={{ width: '0%' }}
-          animate={{ width: '100%' }}
-          transition={{ duration: 2.5, ease: 'linear' }}
+          initial={{ width: "0%" }}
+          animate={{ width: "100%" }}
+          transition={{ duration: 2.5, ease: "linear" }}
         />
       </div>
 
@@ -871,7 +970,11 @@ interface ExitWarningModalProps {
   onExit: () => void;
 }
 
-function ExitWarningModal({ progress, onContinue, onExit }: ExitWarningModalProps) {
+function ExitWarningModal({
+  progress,
+  onContinue,
+  onExit,
+}: ExitWarningModalProps) {
   return (
     <>
       <motion.div
@@ -891,8 +994,8 @@ function ExitWarningModal({ progress, onContinue, onExit }: ExitWarningModalProp
         <div
           className="max-w-md w-full rounded-[24px] p-8 text-center pointer-events-auto"
           style={{
-            background: 'var(--cosmic-surface)',
-            border: '1px solid var(--glass-border)',
+            background: "var(--cosmic-surface)",
+            border: "1px solid var(--glass-border)",
           }}
           onClick={(e) => e.stopPropagation()}
         >
@@ -903,7 +1006,8 @@ function ExitWarningModal({ progress, onContinue, onExit }: ExitWarningModalProp
           </h2>
 
           <p className="text-[17px] text-white/65 mb-2 leading-relaxed">
-            지금까지 <strong className="text-white">{progress}문항</strong> 완료했어요.
+            지금까지 <strong className="text-white">{progress}문항</strong>{" "}
+            완료했어요.
           </p>
           <p className="text-[17px] text-white/65 mb-8 leading-relaxed">
             여기서 나가면 처음부터 다시 시작해야 합니다.
@@ -916,8 +1020,8 @@ function ExitWarningModal({ progress, onContinue, onExit }: ExitWarningModalProp
               onClick={onContinue}
               className="w-full py-4 rounded-full font-semibold text-[17px]"
               style={{
-                background: 'var(--action-blue)',
-                color: 'white',
+                background: "var(--action-blue)",
+                color: "white",
               }}
             >
               계속하기

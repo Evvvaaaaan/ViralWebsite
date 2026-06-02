@@ -238,23 +238,6 @@ export default function LandingScreen({ onStart }: LandingScreenProps) {
         </motion.div>
       </div>
 
-      <motion.div
-        initial={{ y: 100, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 1, duration: 0.8 }}
-        className="absolute bottom-0 left-0 right-0 h-32 backdrop-blur-lg flex items-center justify-center border-t border-white/10"
-        style={{
-          background: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(15, 12, 41, 0.8) 100%)',
-        }}
-      >
-        <motion.div
-          animate={{ y: [0, -8, 0] }}
-          transition={{ duration: 2, repeat: Infinity }}
-          className="text-[13px] text-white/45"
-        >
-          결과 미리보기 ↓
-        </motion.div>
-      </motion.div>
 
       {/* Engagement Toast */}
       <EngagementToast />

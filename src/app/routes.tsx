@@ -1,11 +1,5 @@
 import { createBrowserRouter } from "react-router";
 import QuizFlow from "./components/QuizFlow";
-import StatsPage from "./pages/StatsPage";
-// import AdminPage from "./pages/AdminPage";
-import AboutPage from "./pages/AboutPage";
-import ResultPage from "./pages/ResultPage";
-import LeaderboardPage from "./pages/LeaderboardPage";
-import DownloadPage from "./components/DownloadPage";
 
 export const router = createBrowserRouter([
   {
@@ -14,27 +8,45 @@ export const router = createBrowserRouter([
   },
   {
     path: "/result",
-    Component: ResultPage,
+    lazy: async () => {
+      const { default: ResultPage } = await import("./pages/ResultPage");
+      return { Component: ResultPage };
+    },
   },
   {
     path: "/leaderboard",
-    Component: LeaderboardPage,
+    lazy: async () => {
+      const { default: LeaderboardPage } = await import("./pages/LeaderboardPage");
+      return { Component: LeaderboardPage };
+    },
   },
   {
     path: "/stats",
-    Component: StatsPage,
+    lazy: async () => {
+      const { default: StatsPage } = await import("./pages/StatsPage");
+      return { Component: StatsPage };
+    },
   },
   // {
   //   path: "/admin",
-  //   Component: AdminPage,
+  //   lazy: async () => {
+  //     const { default: AdminPage } = await import("./pages/AdminPage");
+  //     return { Component: AdminPage };
+  //   },
   // },
   {
     path: "/about",
-    Component: AboutPage,
+    lazy: async () => {
+      const { default: AboutPage } = await import("./pages/AboutPage");
+      return { Component: AboutPage };
+    },
   },
   {
     path: "/download",
-    Component: DownloadPage,
+    lazy: async () => {
+      const { default: DownloadPage } = await import("./components/DownloadPage");
+      return { Component: DownloadPage };
+    },
   },
 ], {
   basename: "/percentme"

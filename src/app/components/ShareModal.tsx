@@ -1,13 +1,16 @@
 import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Download, Link as LinkIcon, Check, Share, MessageCircle, Loader2 } from 'lucide-react';
+import { X, Download, Link as LinkIcon, Check, MessageCircle, Loader2 } from 'lucide-react';
 import { logGAEvent } from '../utils/analytics';
 import { logUserEvent } from '../utils/apiClient';
+import { createResultImageBlob, downloadImageBlob, isMobile } from '../utils/resultImage';
+import type { ResultImageData } from '../utils/resultImage';
+import InstagramIcon from './InstagramIcon';
+import MobileSaveModal from './MobileSaveModal';
 
 interface ShareModalProps {
   isOpen: boolean;
   onClose: () => void;
-  resultScreenRef: React.RefObject<HTMLDivElement>;
   resultData: {
     percentile: number;
     grade: string;
@@ -17,26 +20,15 @@ interface ShareModalProps {
       label: string;
       icon: any;
     };
-    userType?: {
-      name: string;
-      rarity: number;
-    };
+    userType?: string;
+    imageData: ResultImageData;
   };
 }
 
-const InstagramIcon = ({ className = "w-6 h-6" }: { className?: string }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
-    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
-    <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
-  </svg>
-);
-
-export default function ShareModal({ isOpen, onClose, resultScreenRef, resultData }: ShareModalProps) {
+export default function ShareModal({ isOpen, onClose, resultData }: ShareModalProps) {
   const [shareUrl, setShareUrl] = useState('');
   const [copied, setCopied] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
-  const [captureReady, setCaptureReady] = useState(false);
   const [imageBlob, setImageBlob] = useState<Blob | null>(null);
   const [mobileSaveImage, setMobileSaveImage] = useState<string | null>(null);
   const [mobileSaveContext, setMobileSaveContext] = useState<'instagram' | 'save' | null>(null);
@@ -55,61 +47,26 @@ export default function ShareModal({ isOpen, onClose, resultScreenRef, resultDat
       logUserEvent('share_modal_opened');
       const url = 'https://lyralab.site/percentme';
       setShareUrl(url);
-      setCaptureReady(false);
       setImageBlob(null);
 
       // Pre-capture image in background
-      captureResultImage().then(() => setCaptureReady(true));
+      captureResultImage();
     }
   }, [isOpen]);
 
-  /**
-   * 결과 화면 전체를 이미지로 캡처
-   * resultScreenRef가 가리키는 전체 결과 영역을 고품질로 캡처
-   */
   const captureResultImage = useCallback(async (): Promise<Blob | null> => {
-    if (!resultScreenRef.current) return null;
-
     try {
       setIsCapturing(true);
-
-      // 캡처 전에 스크롤 위치 저장
-      const scrollParent = resultScreenRef.current.closest('.overflow-y-auto') || window;
-      const prevScroll = scrollParent instanceof Window ? window.scrollY : (scrollParent as HTMLElement).scrollTop;
-
-      const html2canvas = (await import('html2canvas')).default;
-      const canvas = await html2canvas(resultScreenRef.current, {
-        backgroundColor: '#000000',
-        scale: 2,
-        logging: false,
-        useCORS: true,
-        allowTaint: true,
-        // 전체 높이를 캡처하도록 scrollY를 0으로
-        windowHeight: resultScreenRef.current.scrollHeight,
-        height: resultScreenRef.current.scrollHeight,
-        y: 0,
-      });
-
-      // 스크롤 위치 복원
-      if (scrollParent instanceof Window) {
-        window.scrollTo(0, prevScroll);
-      } else {
-        (scrollParent as HTMLElement).scrollTop = prevScroll;
-      }
-
-      return new Promise((resolve) => {
-        canvas.toBlob((blob) => {
-          setImageBlob(blob);
-          setIsCapturing(false);
-          resolve(blob);
-        }, 'image/png', 1.0);
-      });
+      const blob = await createResultImageBlob(resultData.imageData);
+      setImageBlob(blob);
+      setIsCapturing(false);
+      return blob;
     } catch (error) {
       console.error('Failed to capture result image:', error);
       setIsCapturing(false);
       return null;
     }
-  }, [resultScreenRef]);
+  }, [resultData.imageData]);
 
   /**
    * 인스타그램 스토리 공유 (이미지 파일 전달)
@@ -124,9 +81,8 @@ export default function ShareModal({ isOpen, onClose, resultScreenRef, resultDat
     if (!blob) return;
 
     const file = new File([blob], 'quiz-result.png', { type: 'image/png' });
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
-    if (isMobile && navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+    if (isMobile() && navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
       try {
         await navigator.share({
           files: [file],
@@ -151,7 +107,7 @@ export default function ShareModal({ isOpen, onClose, resultScreenRef, resultDat
   const handleKakaoShare = async () => {
     logGAEvent('kakao_share_modal_clicked', 'engagement', 'Share Modal');
     logUserEvent('kakao_share_modal_clicked');
-    const text = `나는 전국 상위 ${resultData.percentile}%! 🏆\n${resultData.userType ? `유형: ${resultData.userType.name}` : ''}\n당신의 순위는?`;
+    const text = `나는 전국 상위 ${resultData.percentile}%! 🏆\n${resultData.userType ? `유형: ${resultData.userType}` : ''}\n당신의 순위는?`;
 
     if (navigator.share) {
       try {
@@ -162,8 +118,7 @@ export default function ShareModal({ isOpen, onClose, resultScreenRef, resultDat
       }
     }
 
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-    if (isMobile) {
+    if (isMobile()) {
       window.location.href = `kakaotalk://send?msg=${encodeURIComponent(`${text}\n${shareUrl}`)}`;
       return;
     }
@@ -211,7 +166,7 @@ export default function ShareModal({ isOpen, onClose, resultScreenRef, resultDat
   };
 
   /**
-   * 이미지 다운로드 - 결과 페이지 전체를 이미지로 저장
+   * 이미지 다운로드 - 결과 페이지 상단부터 전략 카드까지 저장
    */
   const handleDownloadImage = async () => {
     logGAEvent('image_save_modal_clicked', 'engagement', 'Share Modal');
@@ -222,37 +177,21 @@ export default function ShareModal({ isOpen, onClose, resultScreenRef, resultDat
     }
     if (!blob) return;
 
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-
-    if (isMobile) {
-      try {
-        const file = new File([blob], `rank-result-${Date.now()}.png`, { type: 'image/png' });
-        if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-          await navigator.share({
-            files: [file],
-            title: '전국 순위 테스트 결과 저장',
-          });
+    if (isMobile()) {
+      const file = new File([blob], `순위테스트-결과-상위${resultData.percentile}%.png`, { type: 'image/png' });
+      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file], title: '전국 순위 테스트 결과' });
           return;
+        } catch (err) {
+          if ((err as Error).name === 'AbortError') return;
         }
-      } catch (shareErr) {
-        if ((shareErr as Error).name === 'AbortError') return; // User cancelled
-        console.warn('Native share failed, fallback to modal:', shareErr);
       }
-
-      // Fallback to long-press modal
-      const url = URL.createObjectURL(blob);
-      setMobileSaveImage(url);
+      setMobileSaveImage(URL.createObjectURL(blob));
+      setMobileSaveContext('save');
     } else {
-      // Desktop download
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.download = `순위테스트-결과-상위${resultData.percentile}%-${Date.now()}.png`;
-      link.href = url;
-      link.style.display = 'none';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      const fileName = `순위테스트-결과-상위${resultData.percentile}%-${Date.now()}.png`;
+      downloadImageBlob(blob, fileName);
     }
   };
 
@@ -383,54 +322,13 @@ export default function ShareModal({ isOpen, onClose, resultScreenRef, resultDat
 
           {/* 모바일 이미지 길게 눌러 저장 유도 모달 */}
           <AnimatePresence>
-            {mobileSaveImage && (
-              <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/95 backdrop-blur-md pointer-events-auto">
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  className="relative w-full max-w-sm rounded-3xl p-6 overflow-hidden flex flex-col items-center"
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.05)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.37)',
-                  }}
-                >
-                  <button
-                    onClick={closeMobileSaveModal}
-                    className="absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors pointer-events-auto"
-                  >
-                    <X className="w-4 h-4 text-white" />
-                  </button>
-
-                  <div className="text-center mt-2 mb-4">
-                    <h3 className="text-[18px] font-bold text-white mb-1">
-                      {mobileSaveContext === 'instagram' ? '인스타 스토리 공유하기' : '갤러리(사진첩)에 저장하기'}
-                    </h3>
-                    <p className="text-[12px] text-white/60">
-                      아래 이미지를 꾹 누르면 저장 메뉴가 나타납니다.
-                    </p>
-                  </div>
-
-                  {/* 이미지 꾹 누르기 프레임 */}
-                  <div className="relative w-full aspect-[9/16] max-h-[50vh] rounded-2xl overflow-y-auto border border-white/10 bg-black/40 shadow-inner flex items-start justify-center p-2 mb-4 pointer-events-auto">
-                    <img
-                      src={mobileSaveImage}
-                      alt="결과 화면"
-                      className="w-full h-auto rounded-lg select-all object-contain"
-                      style={{ WebkitTouchCallout: 'default' }}
-                    />
-                  </div>
-
-                  <div className="w-full text-center py-2 px-4 rounded-xl bg-white/5 border border-white/5 animate-pulse">
-                    <span className="text-[12px] text-red-400 font-semibold">
-                      {mobileSaveContext === 'instagram' 
-                        ? '💡 이미지를 3초간 길게 눌러 저장 후, 인스타 스토리에서 업로드하세요!' 
-                        : '💡 이미지를 3초간 길게 눌러 사진 앱에 추가하세요'}
-                    </span>
-                  </div>
-                </motion.div>
-              </div>
+            {mobileSaveImage && mobileSaveContext && (
+              <MobileSaveModal
+                imageUrl={mobileSaveImage}
+                context={mobileSaveContext}
+                onClose={closeMobileSaveModal}
+                zIndex="z-[60]"
+              />
             )}
           </AnimatePresence>
         </>

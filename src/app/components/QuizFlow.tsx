@@ -11,6 +11,22 @@ import SessionRecoveryBanner from './SessionRecoveryBanner';
 import { AnimatePresence } from 'motion/react';
 import type { Gender, QuizAnswer, Screen } from '../types';
 import { submitResult } from '../utils/apiClient';
+import { getQuestions, resultCategoryMap, type ResultCategoryKey } from '../data/questions';
+
+interface CalculatedResult {
+  percentile: number;
+  grade: 'S' | 'A' | 'B' | 'C' | 'D' | 'F';
+  total: number;
+  categories: Record<ResultCategoryKey, number>;
+  gender: Gender;
+  ageGroup: string;
+  rankings?: {
+    national: number;
+    region: number | null;
+    ageGroup: number | null;
+  };
+  id?: string;
+}
 
 export default function QuizFlow() {
   const navigate = useNavigate();
@@ -21,6 +37,7 @@ export default function QuizFlow() {
   const [isChallengeMode, setIsChallengeMode] = useState(false);
   const [savedSession, setSavedSession] = useState<any>(null);
   const [showRecoveryBanner, setShowRecoveryBanner] = useState(false);
+  const [initialQuestionIndex, setInitialQuestionIndex] = useState(0);
 
   // Check for challenge URL and saved session
   useEffect(() => {
@@ -50,6 +67,7 @@ export default function QuizFlow() {
       setGender(savedSession.gender);
       setAgeGroup(savedSession.ageGroup || '25~29세');
       setAnswers(savedSession.answers);
+      setInitialQuestionIndex(savedSession.currentQuestion || savedSession.answers.length || 0);
       setCurrentScreen('quiz');
       setShowRecoveryBanner(false);
     }
@@ -110,13 +128,7 @@ export default function QuizFlow() {
         calculatedResult.id = id;
 
         // 등급 재계산 (실제 순위 기반)
-        const percentile = rankings.national;
-        if (percentile <= 1) calculatedResult.grade = 'S';
-        else if (percentile <= 5) calculatedResult.grade = 'A';
-        else if (percentile <= 15) calculatedResult.grade = 'B';
-        else if (percentile <= 40) calculatedResult.grade = 'C';
-        else if (percentile <= 70) calculatedResult.grade = 'D';
-        else calculatedResult.grade = 'F';
+        calculatedResult.grade = gradeFromPercentile(rankings.national);
       }
     } catch (error) {
       console.error('Failed to submit result to server:', error);
@@ -145,12 +157,13 @@ export default function QuizFlow() {
     setGender(null);
     setAgeGroup(null);
     setAnswers([]);
+    setInitialQuestionIndex(0);
     localStorage.removeItem('quiz-session');
     localStorage.removeItem('quiz-result');
   };
 
   return (
-    <div className="w-full min-h-screen overflow-x-hidden" style={{
+    <div className="w-full min-h-dvh overflow-x-hidden" style={{
       background: currentScreen === 'landing' ? '#000000' :
                  currentScreen === 'gender' || currentScreen === 'age' ? 'var(--cosmic-deep)' :
                  currentScreen === 'loading' ? 'linear-gradient(180deg, #000000 0%, var(--cosmic-deep) 100%)' :
@@ -166,6 +179,7 @@ export default function QuizFlow() {
           ageGroup={ageGroup || '25~29세'}
           onComplete={handleQuizComplete}
           initialAnswers={answers}
+          initialQuestionIndex={initialQuestionIndex}
         />
       )}
       {currentScreen === 'loading' && <LoadingScreen />}
@@ -199,6 +213,15 @@ export default function QuizFlow() {
   );
 }
 
+function gradeFromPercentile(percentile: number): 'S' | 'A' | 'B' | 'C' | 'D' | 'F' {
+  if (percentile <= 1) return 'S';
+  if (percentile <= 5) return 'A';
+  if (percentile <= 15) return 'B';
+  if (percentile <= 40) return 'C';
+  if (percentile <= 70) return 'D';
+  return 'F';
+}
+
 function normalCDF(x: number, mean: number, stdDev: number): number {
   const z = (x - mean) / stdDev;
   const t = 1 / (1 + 0.2316419 * Math.abs(z));
@@ -209,15 +232,23 @@ function normalCDF(x: number, mean: number, stdDev: number): number {
   return cdf;
 }
 
-function calculateResult(answers: QuizAnswer[], gender: Gender, ageGroup: string | null) {
-  // Calculate scores by category
-  const categories = {
-    selfCare: answers.slice(0, 5).reduce((sum, a) => sum + a.answer, 0),
-    economy: answers.slice(5, 10).reduce((sum, a) => sum + a.answer, 0),
-    social: answers.slice(10, 15).reduce((sum, a) => sum + a.answer, 0),
-    lifestyle: answers.slice(15, 20).reduce((sum, a) => sum + a.answer, 0),
-    mindset: answers.slice(20, 25).reduce((sum, a) => sum + a.answer, 0),
+function calculateResult(answers: QuizAnswer[], gender: Gender, ageGroup: string | null): CalculatedResult {
+  const age = ageGroup || '25~29세';
+  const questionsList = getQuestions(age);
+  const answersByQuestionId = new Map(answers.map((answer) => [answer.questionId, answer.answer]));
+  const categories: Record<ResultCategoryKey, number> = {
+    selfCare: 0,
+    economy: 0,
+    social: 0,
+    lifestyle: 0,
+    mindset: 0,
   };
+
+  questionsList.forEach((question) => {
+    const score = answersByQuestionId.get(question.id);
+    if (score === undefined) return;
+    categories[resultCategoryMap[question.category]] += score;
+  });
 
   const total = Object.values(categories).reduce((sum, score) => sum + score, 0);
 
@@ -225,7 +256,6 @@ function calculateResult(answers: QuizAnswer[], gender: Gender, ageGroup: string
   let mean = 66;
   let stdDev = 16;
 
-  const age = ageGroup || '25~29세';
   if (age === '10대') {
     mean = 52;
     stdDev = 13;
@@ -247,14 +277,7 @@ function calculateResult(answers: QuizAnswer[], gender: Gender, ageGroup: string
   const cdfVal = normalCDF(total, mean, stdDev);
   const percentile = Math.max(0.1, Math.min(99.9, parseFloat(((1 - cdfVal) * 100).toFixed(1))));
 
-  // Determine grade based on percentile
-  let grade: 'S' | 'A' | 'B' | 'C' | 'D' | 'F';
-  if (percentile <= 1) grade = 'S';
-  else if (percentile <= 5) grade = 'A';
-  else if (percentile <= 15) grade = 'B';
-  else if (percentile <= 40) grade = 'C';
-  else if (percentile <= 70) grade = 'D';
-  else grade = 'F';
+  const grade = gradeFromPercentile(percentile);
 
   return {
     percentile,

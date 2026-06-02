@@ -1,25 +1,51 @@
-import { useEffect, useState, useRef } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer } from 'recharts';
-import { Crown, Diamond, Star, Sparkles, BarChart3, Sprout, Gem, Target, TrendingUp, Share2, MessageCircle, User, UserCircle, Dumbbell, Wallet, Users, Compass, Brain, MapPin, CalendarDays, Download, Loader2, X } from 'lucide-react';
-import type { Gender } from '../types';
-import confetti from 'canvas-confetti';
-import ShareModal from './ShareModal';
-import { Link } from 'react-router';
-import { logGAEvent } from '../utils/analytics';
-import { logUserEvent } from '../utils/apiClient';
+import { useEffect, useState } from "react";
+import { motion, AnimatePresence } from "motion/react";
+import {
+  Crown,
+  Diamond,
+  Star,
+  Sparkles,
+  BarChart3,
+  Sprout,
+  Gem,
+  Target,
+  TrendingUp,
+  MessageCircle,
+  User,
+  Dumbbell,
+  Wallet,
+  Users,
+  Compass,
+  Brain,
+  MapPin,
+  CalendarDays,
+  Download,
+  Loader2,
+} from 'lucide-react';
+import type { Gender } from "../types";
+import confetti from "canvas-confetti";
+import ShareModal from "./ShareModal";
+import { Link } from "react-router";
+import { logGAEvent } from "../utils/analytics";
+import { logUserEvent } from "../utils/apiClient";
+import { createResultImageBlob, downloadImageBlob, isMobile, type ResultImageData } from "../utils/resultImage";
+import InstagramIcon from "./InstagramIcon";
+import MobileSaveModal from "./MobileSaveModal";
 
 // 카테고리별 유형명 매핑
 const categoryTypes: Record<string, { adjective: string; noun: string }> = {
-  selfCare: { adjective: '건강한', noun: '관리자' },
-  economy: { adjective: '똑똑한', noun: '재테크형' },
-  social: { adjective: '따뜻한', noun: '소셜형' },
-  lifestyle: { adjective: '감각적인', noun: '라이프러' },
-  mindset: { adjective: '강인한', noun: '성장형' },
+  selfCare: { adjective: "건강한", noun: "관리자" },
+  economy: { adjective: "똑똑한", noun: "재테크형" },
+  social: { adjective: "따뜻한", noun: "소셜형" },
+  lifestyle: { adjective: "감각적인", noun: "라이프형" },
+  mindset: { adjective: "강인한", noun: "성장형" },
 };
 
 // 유형명 생성 함수
-function generateTypeName(categories: Record<string, number>): { name: string; rarity: number } {
+function generateTypeName(categories: Record<string, number>): {
+  name: string;
+  rarity: number;
+} {
   const sorted = Object.entries(categories)
     .sort(([, a], [, b]) => b - a)
     .slice(0, 2);
@@ -46,68 +72,170 @@ interface ResultScreenProps {
 
 const gradeConfig = {
   S: {
-    color: '#f5a623',
-    glow: 'rgba(245, 166, 35, 0.5)',
-    label: '전설',
+    color: "#f5a623",
+    glow: "rgba(245, 166, 35, 0.5)",
+    label: "전설",
     icon: Crown,
-    message: '전국 상위 1%. 당신 같은 사람, 100명 중 1명입니다.',
+    message: "전국 상위 1%. 당신 같은 사람, 100명 중 1명입니다.",
   },
   A: {
-    color: '#7b68ee',
-    glow: 'rgba(123, 104, 238, 0.3)',
-    label: '탁월',
+    color: "#7b68ee",
+    glow: "rgba(123, 104, 238, 0.3)",
+    label: "탁월",
     icon: Diamond,
-    message: '전국 상위 5%. 매우 뛰어난 수준입니다.',
+    message: "전국 상위 5%. 매우 뛰어난 수준입니다.",
   },
   B: {
-    color: '#00d4aa',
-    glow: 'rgba(0, 212, 170, 0.25)',
-    label: '이상형급',
+    color: "#00d4aa",
+    glow: "rgba(0, 212, 170, 0.25)",
+    label: "이상형급",
     icon: Star,
-    message: '전국 상위 15%. 이상형에 가까운 수준입니다.',
+    message: "전국 상위 15%. 이상형에 가까운 수준입니다.",
   },
   C: {
-    color: '#4fc3f7',
-    glow: 'rgba(79, 195, 247, 0.2)',
-    label: '평균 이상',
+    color: "#4fc3f7",
+    glow: "rgba(79, 195, 247, 0.2)",
+    label: "평균 이상",
     icon: Sparkles,
-    message: '전국 평균 이상. 좋은 수준입니다.',
+    message: "전국 평균 이상. 좋은 수준입니다.",
   },
   D: {
-    color: '#aaaaaa',
-    glow: 'rgba(170, 170, 170, 0.15)',
-    label: '평범',
+    color: "#aaaaaa",
+    glow: "rgba(170, 170, 170, 0.15)",
+    label: "평범",
     icon: BarChart3,
-    message: '전국 평균 수준입니다.',
+    message: "전국 평균 수준입니다.",
   },
   F: {
-    color: '#ff6b6b',
-    glow: 'rgba(255, 107, 107, 0.2)',
-    label: '성장 중',
+    color: "#ff6b6b",
+    glow: "rgba(255, 107, 107, 0.2)",
+    label: "성장 중",
     icon: Sprout,
-    message: '지금이 시작점이에요. 함께 성장해봐요.',
+    message: "지금이 시작점이에요. 함께 성장해봐요.",
   },
 };
 
-const InstagramIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
-    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
-    <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
-  </svg>
-);
+const radarCategories = [
+  { key: "selfCare", label: "자기관리" },
+  { key: "economy", label: "경제력" },
+  { key: "social", label: "사회성" },
+  { key: "lifestyle", label: "라이프" },
+  { key: "mindset", label: "마인드셋" },
+] as const;
 
-export default function ResultScreen({ result, gender, onRestart }: ResultScreenProps) {
+function ResultRadarChart({
+  categories,
+  color,
+  fillOpacity,
+}: {
+  categories: ResultImageData["categories"];
+  color: string;
+  fillOpacity: number;
+}) {
+  const size = 320;
+  const cx = size / 2;
+  const cy = size / 2;
+  const radius = 100;
+  const maxValue = 25;
+
+  const point = (index: number, scale: number) => {
+    const angle = -Math.PI / 2 + (Math.PI * 2 * index) / radarCategories.length;
+    return {
+      x: cx + Math.cos(angle) * radius * scale,
+      y: cy + Math.sin(angle) * radius * scale,
+    };
+  };
+
+  const polygonPoints = radarCategories
+    .map(({ key }, index) => {
+      const scale = Math.max(0, Math.min(1, categories[key] / maxValue));
+      const { x, y } = point(index, scale);
+      return `${x},${y}`;
+    })
+    .join(" ");
+
+  return (
+    <svg
+      width="100%"
+      height="100%"
+      viewBox={`0 0 ${size} ${size}`}
+      role="img"
+      aria-label="역량 분석 레이더 차트"
+      className="block"
+    >
+      {[1 / 3, 2 / 3, 1].map((scale) => (
+        <polygon
+          key={scale}
+          points={radarCategories
+            .map((_, index) => {
+              const { x, y } = point(index, scale);
+              return `${x},${y}`;
+            })
+            .join(" ")}
+          fill="none"
+          stroke="rgba(255, 255, 255, 0.1)"
+          strokeWidth="1"
+        />
+      ))}
+
+      {radarCategories.map(({ label }, index) => {
+        const outer = point(index, 1);
+        const angle = -Math.PI / 2 + (Math.PI * 2 * index) / radarCategories.length;
+        const labelX = cx + Math.cos(angle) * (radius + 38);
+        const labelY = cy + Math.sin(angle) * (radius + 38);
+
+        return (
+          <g key={label}>
+            <line
+              x1={cx}
+              y1={cy}
+              x2={outer.x}
+              y2={outer.y}
+              stroke="rgba(255, 255, 255, 0.1)"
+              strokeWidth="1"
+            />
+            <text
+              x={labelX}
+              y={labelY}
+              dy="0.35em"
+              textAnchor="middle"
+              fill="rgba(255, 255, 255, 0.65)"
+              fontSize="12"
+              fontWeight="500"
+            >
+              {label}
+            </text>
+          </g>
+        );
+      })}
+
+      <polygon
+        points={polygonPoints}
+        fill={color}
+        fillOpacity={fillOpacity}
+        stroke={color}
+        strokeWidth="2.5"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export default function ResultScreen({
+  result,
+  gender,
+  onRestart,
+}: ResultScreenProps) {
   const [displayPercentile, setDisplayPercentile] = useState(0);
-  const [showParticles, setShowParticles] = useState(true);
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [showRankChange, setShowRankChange] = useState(false);
   const [newPercentile, setNewPercentile] = useState(result.percentile);
-  const resultScreenRef = useRef<HTMLDivElement>(null);
-  const captureRef = useRef<HTMLDivElement>(null);
   const [isCapturing, setIsCapturing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [mobileSaveImage, setMobileSaveImage] = useState<string | null>(null);
-  const [mobileSaveContext, setMobileSaveContext] = useState<'instagram' | 'save' | null>(null);
+  const [mobileSaveContext, setMobileSaveContext] = useState<
+    "instagram" | "save" | null
+  >(null);
   const grade = gradeConfig[result.grade as keyof typeof gradeConfig];
 
   const closeMobileSaveModal = () => {
@@ -117,7 +245,8 @@ export default function ResultScreen({ result, gender, onRestart }: ResultScreen
       setMobileSaveContext(null);
     }
   };
-  const isTopRank = result.grade === 'S';
+
+  const isTopRank = result.grade === "S";
 
   // 유형명 생성
   const userType = generateTypeName(result.categories);
@@ -131,8 +260,16 @@ export default function ResultScreen({ result, gender, onRestart }: ResultScreen
 
   // 결과 화면 마운트 시 행동 분석 로깅
   useEffect(() => {
-    logGAEvent('result_viewed', 'conversion', `Percentile: ${result.percentile} (${result.grade})`);
-    logUserEvent('result_viewed', { percentile: result.percentile, grade: result.grade, gender });
+    logGAEvent(
+      "result_viewed",
+      "conversion",
+      `Percentile: ${result.percentile} (${result.grade})`,
+    );
+    logUserEvent("result_viewed", {
+      percentile: result.percentile,
+      grade: result.grade,
+      gender,
+    });
   }, [result.percentile, result.grade, gender]);
 
   // 순위 변동 알림 (30-90초 후)
@@ -143,7 +280,9 @@ export default function ResultScreen({ result, gender, onRestart }: ResultScreen
     const timer = setTimeout(() => {
       // 보고서 명세: 순위 소폭 하락 (0.05 ~ 0.15% 증가)
       const increase = (Math.random() * 0.1 + 0.05).toFixed(2);
-      const updated = parseFloat((result.percentile + parseFloat(increase)).toFixed(2));
+      const updated = parseFloat(
+        (result.percentile + parseFloat(increase)).toFixed(2),
+      );
       setNewPercentile(updated);
       setShowRankChange(true);
 
@@ -162,137 +301,106 @@ export default function ResultScreen({ result, gender, onRestart }: ResultScreen
 
   /** 빠른 인스타그램 스토리 공유 (결과 화면에서 바로) */
   const handleInstagramShare = async () => {
-    logGAEvent('insta_share_clicked', 'engagement', 'Quick Actions');
-    logUserEvent('insta_share_clicked', { source: 'result_page' });
-    if (!captureRef.current) return;
+    logGAEvent("insta_share_clicked", "engagement", "Quick Actions");
+    logUserEvent("insta_share_clicked", { source: "result_page" });
     try {
       setIsCapturing(true);
-      const html2canvas = (await import('html2canvas')).default;
-      const canvas = await html2canvas(captureRef.current, {
-        backgroundColor: '#000000',
-        scale: 2,
-        logging: false,
-        useCORS: true,
-        allowTaint: true,
-        height: captureRef.current.scrollHeight,
-        y: 0,
-      });
+      const blob = await createResultImageBlob(getResultImageData());
       setIsCapturing(false);
 
-      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png', 1.0));
       if (blob) {
-        const file = new File([blob], 'quiz-result.png', { type: 'image/png' });
-        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-
-        if (isMobile && navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+        const file = new File([blob], "quiz-result.png", { type: "image/png" });
+        if (
+          isMobile() &&
+          navigator.share &&
+          navigator.canShare &&
+          navigator.canShare({ files: [file] })
+        ) {
           try {
             await navigator.share({
               files: [file],
-              title: '전국 순위 테스트 결과',
+              title: "전국 순위 테스트 결과",
             });
             return;
           } catch (shareErr) {
-            if ((shareErr as Error).name === 'AbortError') return; // User cancelled
-            console.warn('Instagram share failed, fallback to modal:', shareErr);
+            if ((shareErr as Error).name === "AbortError") return; // User cancelled
+            console.warn(
+              "Instagram share failed, fallback to modal:",
+              shareErr,
+            );
           }
         }
 
-        // Fallback to long-press modal with Instagram context
-        const url = URL.createObjectURL(blob);
-        setMobileSaveImage(url);
-        setMobileSaveContext('instagram');
+        setMobileSaveImage(URL.createObjectURL(blob));
+        setMobileSaveContext("instagram");
       }
     } catch (err) {
       setIsCapturing(false);
-      console.error('Instagram share failed:', err);
+      console.error("Instagram share failed:", err);
     }
   };
 
   /** 빠른 카카오톡 공유 */
   const handleKakaoShare = async () => {
-    logGAEvent('kakao_share_clicked', 'engagement', 'Quick Actions');
-    logUserEvent('kakao_share_clicked', { source: 'result_page' });
+    logGAEvent("kakao_share_clicked", "engagement", "Quick Actions");
+    logUserEvent("kakao_share_clicked", { source: "result_page" });
     const text = `나는 전국 상위 ${result.percentile}%! ${userType.name} 유형\n당신의 순위는?`;
-    const url = 'https://lyralab.site/percentme';
+    const url = "https://lyralab.site/percentme";
 
     if (navigator.share) {
       try {
-        await navigator.share({ title: '전국 순위 테스트 결과', text, url });
+        await navigator.share({ title: "전국 순위 테스트 결과", text, url });
         return;
       } catch (err) {
-        if ((err as Error).name === 'AbortError') return;
+        if ((err as Error).name === "AbortError") return;
       }
     }
 
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-    if (isMobile) {
+    if (isMobile()) {
       window.location.href = `kakaotalk://send?msg=${encodeURIComponent(`${text}\n${url}`)}`;
       return;
     }
 
     try {
       await navigator.clipboard.writeText(`${text}\n${url}`);
-      alert('링크가 복사되었습니다! 카카오톡에 붙여넣기하세요.');
+      alert("링크가 복사되었습니다! 카카오톡에 붙여넣기하세요.");
     } catch (_) {}
   };
 
   /** 빠른 이미지 저장 (결과 화면에서 바로) */
   const handleQuickDownload = async () => {
-    logGAEvent('image_save_clicked', 'engagement', 'Quick Actions');
-    logUserEvent('image_save_clicked', { source: 'result_page' });
-    if (!captureRef.current) return;
+    logGAEvent("image_save_clicked", "engagement", "Quick Actions");
+    logUserEvent("image_save_clicked", { source: "result_page" });
     try {
-      setIsCapturing(true);
-      const html2canvas = (await import('html2canvas')).default;
-      const canvas = await html2canvas(captureRef.current, {
-        backgroundColor: '#000000',
-        scale: 2,
-        logging: false,
-        useCORS: true,
-        allowTaint: true,
-        height: captureRef.current.scrollHeight,
-        y: 0,
-      });
-      setIsCapturing(false);
+      setIsSaving(true);
+      const blob = await createResultImageBlob(getResultImageData());
+      setIsSaving(false);
 
-      canvas.toBlob(async (blob) => {
-        if (!blob) return;
+      if (!blob) return;
 
-        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-
-        if (isMobile) {
+      if (isMobile()) {
+        const file = new File([blob], `순위테스트-결과-상위${result.percentile}%.png`, { type: "image/png" });
+        if (
+          navigator.share &&
+          navigator.canShare &&
+          navigator.canShare({ files: [file] })
+        ) {
           try {
-            const file = new File([blob], `rank-result-${Date.now()}.png`, { type: 'image/png' });
-            if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-              await navigator.share({
-                files: [file],
-                title: '전국 순위 테스트 결과 저장',
-              });
-              return;
-            }
+            await navigator.share({ files: [file], title: "전국 순위 테스트 결과" });
+            return;
           } catch (shareErr) {
-            if ((shareErr as Error).name === 'AbortError') return; // User cancelled
-            console.warn('Native share failed, fallback to modal:', shareErr);
+            if ((shareErr as Error).name === "AbortError") return;
           }
-
-          // Fallback to long-press modal
-          const url = URL.createObjectURL(blob);
-          setMobileSaveImage(url);
-        } else {
-          // Desktop download
-          const url = URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          link.download = `순위테스트-결과-상위${result.percentile}%-${Date.now()}.png`;
-          link.href = url;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          URL.revokeObjectURL(url);
         }
-      }, 'image/png', 1.0);
+        setMobileSaveImage(URL.createObjectURL(blob));
+        setMobileSaveContext("save");
+      } else {
+        const fileName = `순위테스트-결과-상위${result.percentile}%-${Date.now()}.png`;
+        downloadImageBlob(blob, fileName);
+      }
     } catch (err) {
-      setIsCapturing(false);
-      console.error('Download failed:', err);
+      setIsSaving(false);
+      console.error("Download failed:", err);
     }
   };
 
@@ -308,7 +416,7 @@ export default function ResultScreen({ result, gender, onRestart }: ResultScreen
           angle: 60,
           spread: 80,
           origin: { x: 0, y: 0.5 },
-          colors: ['#f5a623', '#ffd700', '#ffed4e', '#ffa500'],
+          colors: ["#f5a623", "#ffd700", "#ffed4e", "#ffa500"],
           gravity: 0.8,
           scalar: 1.2,
         });
@@ -317,15 +425,13 @@ export default function ResultScreen({ result, gender, onRestart }: ResultScreen
           angle: 120,
           spread: 80,
           origin: { x: 1, y: 0.5 },
-          colors: ['#f5a623', '#ffd700', '#ffed4e', '#ffa500'],
+          colors: ["#f5a623", "#ffd700", "#ffed4e", "#ffa500"],
           gravity: 0.8,
           scalar: 1.2,
         });
 
         if (Date.now() < end) {
           requestAnimationFrame(frame);
-        } else {
-          setShowParticles(false);
         }
       };
       frame();
@@ -352,31 +458,36 @@ export default function ResultScreen({ result, gender, onRestart }: ResultScreen
     return () => clearInterval(timer);
   }, [result.percentile, isTopRank]);
 
-  const radarData = [
-    { category: '자기관리', value: result.categories.selfCare },
-    { category: '경제력', value: result.categories.economy },
-    { category: '사회성', value: result.categories.social },
-    { category: '라이프', value: result.categories.lifestyle },
-    { category: '마인드셋', value: result.categories.mindset },
-  ];
-
   const categoryScores = [
-    { name: '자기관리', icon: Dumbbell, score: result.categories.selfCare },
-    { name: '경제력', icon: Wallet, score: result.categories.economy },
-    { name: '사회성', icon: Users, score: result.categories.social },
-    { name: '라이프스타일', icon: Compass, score: result.categories.lifestyle },
-    { name: '마인드셋', icon: Brain, score: result.categories.mindset },
+    { name: "자기관리", icon: Dumbbell, score: result.categories.selfCare },
+    { name: "경제력", icon: Wallet, score: result.categories.economy },
+    { name: "사회성", icon: Users, score: result.categories.social },
+    { name: "라이프스타일", icon: Compass, score: result.categories.lifestyle },
+    { name: "마인드셋", icon: Brain, score: result.categories.mindset },
   ];
 
   const maxCategory = categoryScores.reduce((max, cat) =>
-    cat.score > max.score ? cat : max
+    cat.score > max.score ? cat : max,
   );
   const minCategory = categoryScores.reduce((min, cat) =>
-    cat.score < min.score ? cat : min
+    cat.score < min.score ? cat : min,
   );
 
+  const getResultImageData = (): ResultImageData => ({
+    percentile: result.percentile,
+    grade: result.grade,
+    total: result.total,
+    gender: gender!,
+    gradeColor: grade.color,
+    typeName: userType.name,
+    rankings: detailedRankings,
+    categories: result.categories,
+    maxCategoryName: maxCategory.name,
+    minCategoryName: minCategory.name,
+  });
+
   return (
-    <div className="w-full min-h-screen overflow-y-auto relative">
+    <div className="w-full min-h-screen relative">
       {/* Animated background for S grade */}
       {isTopRank && (
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
@@ -392,13 +503,16 @@ export default function ResultScreen({ result, gender, onRestart }: ResultScreen
             transition={{
               duration: 2,
               repeat: Infinity,
-              ease: 'easeInOut',
+              ease: "easeInOut",
             }}
           />
         </div>
       )}
 
-      <div ref={captureRef} className="max-w-2xl mx-auto px-6 py-6 relative z-10 min-h-screen flex flex-col justify-center" style={{ background: '#000000' }}>
+      <div
+        className="max-w-2xl mx-auto px-6 py-6 relative z-10 min-h-screen flex flex-col justify-center"
+        style={{ background: "#000000" }}
+      >
         {/* Compact Hero Section */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -426,7 +540,7 @@ export default function ResultScreen({ result, gender, onRestart }: ResultScreen
             transition={{ delay: 0.4 }}
             className="text-[18px] text-white/65 mb-3"
           >
-            의 {gender === 'male' ? '남자' : '여자'}입니다
+            의 {gender === "male" ? "남자" : "여자"}입니다
           </motion.div>
 
           {/* 유형명 + 희귀 뱃지 */}
@@ -445,7 +559,6 @@ export default function ResultScreen({ result, gender, onRestart }: ResultScreen
           >
             <grade.icon className="w-5 h-5" strokeWidth={2} />
             <span>{userType.name}</span>
-            <span className="text-[14px] opacity-90">(전체 {userType.rarity}%)</span>
           </motion.div>
 
           {/* Percentile */}
@@ -455,7 +568,10 @@ export default function ResultScreen({ result, gender, onRestart }: ResultScreen
             transition={{ delay: 0.6 }}
             className="text-[15px] text-white/80 mb-6"
           >
-            전국 기준 <strong style={{ color: grade.color }}>상위 {result.percentile}%</strong>
+            전국 기준{" "}
+            <strong style={{ color: grade.color }}>
+              상위 {result.percentile}%
+            </strong>
           </motion.div>
         </motion.div>
 
@@ -466,9 +582,9 @@ export default function ResultScreen({ result, gender, onRestart }: ResultScreen
           transition={{ delay: 0.65 }}
           className="rounded-[20px] p-4 mb-4"
           style={{
-            background: 'var(--glass-bg)',
-            border: `1px solid ${isTopRank ? grade.color + '40' : 'var(--glass-border)'}`,
-            backdropFilter: 'blur(16px)',
+            background: "var(--glass-bg)",
+            border: `1px solid ${isTopRank ? grade.color + "40" : "var(--glass-border)"}`,
+            backdropFilter: "blur(16px)",
           }}
         >
           <div className="text-[13px] text-white/45 uppercase tracking-wider mb-3 text-center">
@@ -478,7 +594,10 @@ export default function ResultScreen({ result, gender, onRestart }: ResultScreen
             {Array.from({ length: 100 }).map((_, i) => {
               // percentile이 8이면 상위 8%이므로 100명 중 8번째
               // 배열 인덱스는 0부터 시작하므로 인덱스 7
-              const userPosition = Math.max(0, Math.min(99, Math.floor(result.percentile) - 1));
+              const userPosition = Math.max(
+                0,
+                Math.min(99, Math.floor(result.percentile) - 1),
+              );
               const isUser = i === userPosition;
               return (
                 <motion.div
@@ -489,10 +608,10 @@ export default function ResultScreen({ result, gender, onRestart }: ResultScreen
                   className="relative"
                 >
                   <User
-                    className={`w-full h-auto ${isUser ? 'drop-shadow-lg' : ''}`}
+                    className={`w-full h-auto ${isUser ? "drop-shadow-lg" : ""}`}
                     strokeWidth={isUser ? 2.5 : 1.5}
                     style={{
-                      color: isUser ? grade.color : 'rgba(255, 255, 255, 0.15)',
+                      color: isUser ? grade.color : "rgba(255, 255, 255, 0.15)",
                     }}
                   />
                   {isUser && (
@@ -508,7 +627,8 @@ export default function ResultScreen({ result, gender, onRestart }: ResultScreen
             })}
           </div>
           <div className="text-[12px] text-white/60 text-center mt-3">
-            밝게 표시된 사람이 당신입니다 (상위 {result.percentile}%: 100명 중 {Math.floor(result.percentile)}번째)
+            밝게 표시된 사람이 당신입니다 (상위 {result.percentile}%: 100명 중{" "}
+            {Math.floor(result.percentile)}번째)
           </div>
         </motion.div>
 
@@ -519,9 +639,9 @@ export default function ResultScreen({ result, gender, onRestart }: ResultScreen
           transition={{ delay: 0.68 }}
           className="rounded-[20px] p-4 mb-4"
           style={{
-            background: 'var(--glass-bg)',
-            border: `1px solid ${isTopRank ? grade.color + '40' : 'var(--glass-border)'}`,
-            backdropFilter: 'blur(16px)',
+            background: "var(--glass-bg)",
+            border: `1px solid ${isTopRank ? grade.color + "40" : "var(--glass-border)"}`,
+            backdropFilter: "blur(16px)",
           }}
         >
           <div className="text-[13px] text-white/45 uppercase tracking-wider mb-3 text-center">
@@ -533,37 +653,55 @@ export default function ResultScreen({ result, gender, onRestart }: ResultScreen
                 <MapPin className="w-4 h-4 text-white/60" strokeWidth={1.5} />
                 <span className="text-[14px] text-white/80">전국</span>
               </div>
-              <div className="text-[16px] font-semibold" style={{ color: grade.color }}>
+              <div
+                className="text-[16px] font-semibold"
+                style={{ color: grade.color }}
+              >
                 상위 {detailedRankings.national.toFixed(1)}%
               </div>
             </div>
-            {detailedRankings.region !== undefined && detailedRankings.region !== null && (
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <MapPin className="w-4 h-4 text-white/60" strokeWidth={1.5} />
-                  <span className="text-[14px] text-white/80">지역별</span>
+            {detailedRankings.region !== undefined &&
+              detailedRankings.region !== null && (
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <MapPin
+                      className="w-4 h-4 text-white/60"
+                      strokeWidth={1.5}
+                    />
+                    <span className="text-[14px] text-white/80">지역별</span>
+                  </div>
+                  <div
+                    className="text-[16px] font-semibold"
+                    style={{ color: grade.color }}
+                  >
+                    상위 {detailedRankings.region.toFixed(1)}%
+                  </div>
                 </div>
-                <div className="text-[16px] font-semibold" style={{ color: grade.color }}>
-                  상위 {detailedRankings.region.toFixed(1)}%
+              )}
+            {detailedRankings.ageGroup !== undefined &&
+              detailedRankings.ageGroup !== null && (
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <CalendarDays
+                      className="w-4 h-4 text-white/60"
+                      strokeWidth={1.5}
+                    />
+                    <span className="text-[14px] text-white/80">연령대별</span>
+                  </div>
+                  <div
+                    className="text-[16px] font-semibold"
+                    style={{ color: grade.color }}
+                  >
+                    상위 {detailedRankings.ageGroup.toFixed(1)}%
+                  </div>
                 </div>
-              </div>
-            )}
-            {detailedRankings.ageGroup !== undefined && detailedRankings.ageGroup !== null && (
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <CalendarDays className="w-4 h-4 text-white/60" strokeWidth={1.5} />
-                  <span className="text-[14px] text-white/80">연령대별</span>
-                </div>
-                <div className="text-[16px] font-semibold" style={{ color: grade.color }}>
-                  상위 {detailedRankings.ageGroup.toFixed(1)}%
-                </div>
-              </div>
-            )}
+              )}
           </div>
           <div className="text-[11px] text-white/45 text-center mt-3">
-            {detailedRankings.region !== null && detailedRankings.ageGroup !== null
-              ? '더 세분화할수록 희소해집니다'
-              : '추가 정보를 입력하면 더 정확한 순위를 확인할 수 있어요'}
+            {detailedRankings.region !== null &&
+            detailedRankings.ageGroup !== null
+              ? "더 세분화할수록 희소해집니다"
+              : "추가 정보를 입력하면 더 정확한 순위를 확인할 수 있어요"}
           </div>
         </motion.div>
 
@@ -572,32 +710,23 @@ export default function ResultScreen({ result, gender, onRestart }: ResultScreen
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.75 }}
-          className="rounded-[20px] p-3 mb-4 w-full max-w-[360px] mx-auto"
+          className="rounded-[20px] p-4 mb-4 w-full"
           style={{
-            background: 'var(--glass-bg)',
-            border: `1px solid ${isTopRank ? grade.color + '40' : 'var(--glass-border)'}`,
-            backdropFilter: 'blur(16px)',
+            background: "var(--glass-bg)",
+            border: `1px solid ${isTopRank ? grade.color + "40" : "var(--glass-border)"}`,
+            backdropFilter: "blur(16px)",
           }}
         >
           <div className="text-[11px] text-white/45 uppercase tracking-wider mb-1 text-center">
             역량 분석
           </div>
 
-          <div className="flex justify-center">
-            <RadarChart data={radarData} width={280} height={280} margin={{ top: 5, right: 30, bottom: 5, left: 30 }}>
-              <PolarGrid stroke="rgba(255, 255, 255, 0.1)" />
-              <PolarAngleAxis
-                dataKey="category"
-                tick={{ fill: 'rgba(255, 255, 255, 0.65)', fontSize: 11 }}
-              />
-              <Radar
-                dataKey="value"
-                stroke={grade.color}
-                fill={grade.color}
-                fillOpacity={isTopRank ? 0.15 : 0.25}
-                strokeWidth={2}
-              />
-            </RadarChart>
+          <div className="mx-auto w-full max-w-[380px] aspect-square">
+            <ResultRadarChart
+              categories={result.categories}
+              color={grade.color}
+              fillOpacity={isTopRank ? 0.15 : 0.25}
+            />
           </div>
         </motion.div>
 
@@ -611,12 +740,15 @@ export default function ResultScreen({ result, gender, onRestart }: ResultScreen
           <div
             className="rounded-[14px] p-3"
             style={{
-              background: 'var(--glass-bg)',
-              border: '1px solid var(--glass-border)',
+              background: "var(--glass-bg)",
+              border: "1px solid var(--glass-border)",
             }}
           >
             <div className="flex items-start gap-2">
-              <Gem className="w-4 h-4 text-white/80 flex-shrink-0 mt-0.5" strokeWidth={1.5} />
+              <Gem
+                className="w-4 h-4 text-white/80 flex-shrink-0 mt-0.5"
+                strokeWidth={1.5}
+              />
               <div>
                 <div className="text-[13px] font-medium text-white">강점</div>
                 <div className="text-[12px] text-white/65">
@@ -629,14 +761,19 @@ export default function ResultScreen({ result, gender, onRestart }: ResultScreen
           <div
             className="rounded-[14px] p-3"
             style={{
-              background: 'var(--glass-bg)',
-              border: '1px solid var(--glass-border)',
+              background: "var(--glass-bg)",
+              border: "1px solid var(--glass-border)",
             }}
           >
             <div className="flex items-start gap-2">
-              <Target className="w-4 h-4 text-white/80 flex-shrink-0 mt-0.5" strokeWidth={1.5} />
+              <Target
+                className="w-4 h-4 text-white/80 flex-shrink-0 mt-0.5"
+                strokeWidth={1.5}
+              />
               <div>
-                <div className="text-[13px] font-medium text-white">개선 포인트</div>
+                <div className="text-[13px] font-medium text-white">
+                  개선 포인트
+                </div>
                 <div className="text-[12px] text-white/65">
                   {minCategory.name}을 1단계만 높이면 순위가 크게 오릅니다
                 </div>
@@ -647,12 +784,15 @@ export default function ResultScreen({ result, gender, onRestart }: ResultScreen
           <div
             className="rounded-[14px] p-3"
             style={{
-              background: 'var(--glass-bg)',
-              border: '1px solid var(--glass-border)',
+              background: "var(--glass-bg)",
+              border: "1px solid var(--glass-border)",
             }}
           >
             <div className="flex items-start gap-2">
-              <TrendingUp className="w-4 h-4 text-white/80 flex-shrink-0 mt-0.5" strokeWidth={1.5} />
+              <TrendingUp
+                className="w-4 h-4 text-white/80 flex-shrink-0 mt-0.5"
+                strokeWidth={1.5}
+              />
               <div>
                 <div className="text-[13px] font-medium text-white">전략</div>
                 <div className="text-[12px] text-white/65">
@@ -678,8 +818,8 @@ export default function ResultScreen({ result, gender, onRestart }: ResultScreen
               disabled={isCapturing}
               className="py-3.5 rounded-2xl font-semibold text-[15px] flex items-center justify-center gap-2 transition-all duration-300"
               style={{
-                background: '#FEE500',
-                color: '#3A1D1D',
+                background: "#FEE500",
+                color: "#3A1D1D",
               }}
             >
               <MessageCircle className="w-4 h-4" />
@@ -692,9 +832,10 @@ export default function ResultScreen({ result, gender, onRestart }: ResultScreen
               disabled={isCapturing}
               className="py-3.5 rounded-2xl font-semibold text-[15px] flex items-center justify-center gap-2 transition-all duration-300"
               style={{
-                background: 'linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)',
-                color: 'white',
-                boxShadow: '0 4px 15px rgba(220, 39, 67, 0.3)',
+                background:
+                  "linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)",
+                color: "white",
+                boxShadow: "0 4px 15px rgba(220, 39, 67, 0.3)",
               }}
             >
               {isCapturing ? (
@@ -710,15 +851,15 @@ export default function ResultScreen({ result, gender, onRestart }: ResultScreen
           <motion.button
             whileTap={{ scale: 0.97 }}
             onClick={handleQuickDownload}
-            disabled={isCapturing}
+            disabled={isSaving}
             className="w-full py-3.5 rounded-2xl font-semibold text-[15px] flex items-center justify-center gap-2"
             style={{
-              background: 'rgba(255, 255, 255, 0.08)',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
-              color: 'white',
+              background: "rgba(255, 255, 255, 0.08)",
+              border: "1px solid rgba(255, 255, 255, 0.12)",
+              color: "white",
             }}
           >
-            {isCapturing ? (
+            {isSaving ? (
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
               <Download className="w-4 h-4" strokeWidth={2} />
@@ -729,8 +870,8 @@ export default function ResultScreen({ result, gender, onRestart }: ResultScreen
           {/* 더 많은 공유 옵션 */}
           <button
             onClick={() => {
-              logGAEvent('more_shares_clicked', 'engagement', 'Quick Actions');
-              logUserEvent('more_shares_clicked', { source: 'result_page' });
+              logGAEvent("more_shares_clicked", "engagement", "Quick Actions");
+              logUserEvent("more_shares_clicked", { source: "result_page" });
               handleShare();
             }}
             className="w-full py-2 text-[13px] text-white/65 hover:text-white transition-colors"
@@ -740,8 +881,8 @@ export default function ResultScreen({ result, gender, onRestart }: ResultScreen
 
           <button
             onClick={() => {
-              logGAEvent('restart_clicked', 'engagement', 'Quick Actions');
-              logUserEvent('restart_clicked', { source: 'result_page' });
+              logGAEvent("restart_clicked", "engagement", "Quick Actions");
+              logUserEvent("restart_clicked", { source: "result_page" });
               onRestart();
             }}
             className="w-full py-2 text-[13px] text-white/45 hover:text-white/65 transition-colors"
@@ -751,18 +892,17 @@ export default function ResultScreen({ result, gender, onRestart }: ResultScreen
         </motion.div>
       </div>
 
-
       {/* Share Modal */}
       <ShareModal
         isOpen={shareModalOpen}
         onClose={() => setShareModalOpen(false)}
-        resultScreenRef={captureRef}
         resultData={{
           percentile: result.percentile,
           grade: result.grade,
-          gender: gender,
+          gender: gender!,
           gradeConfig: grade,
-          userType: userType,
+          userType: userType.name,
+          imageData: getResultImageData(),
         }}
       />
 
@@ -778,21 +918,31 @@ export default function ResultScreen({ result, gender, onRestart }: ResultScreen
             <div
               className="p-5 rounded-[20px] shadow-2xl"
               style={{
-                background: 'rgba(0, 0, 0, 0.9)',
-                border: '2px solid rgba(255, 107, 107, 0.5)',
-                backdropFilter: 'blur(16px)',
+                background: "rgba(0, 0, 0, 0.9)",
+                border: "2px solid rgba(255, 107, 107, 0.5)",
+                backdropFilter: "blur(16px)",
               }}
             >
               <div className="flex items-center gap-3 mb-2">
-                <TrendingUp size={20} strokeWidth={2} className="text-red-400" />
+                <TrendingUp
+                  size={20}
+                  strokeWidth={2}
+                  className="text-red-400"
+                />
                 <span className="text-[16px] font-bold text-white">
                   순위가 소폭 변동했어요
                 </span>
               </div>
               <div className="text-[14px] text-white/80 mb-1">
-                상위 <span className="text-red-400 font-semibold">{result.percentile}%</span>
-                {' → '}
-                <span className="text-red-400 font-semibold">{newPercentile}%</span>로 조정됐어요
+                상위{" "}
+                <span className="text-red-400 font-semibold">
+                  {result.percentile}%
+                </span>
+                {" → "}
+                <span className="text-red-400 font-semibold">
+                  {newPercentile}%
+                </span>
+                로 조정됐어요
               </div>
               <div className="text-[12px] text-white/50 mt-2">
                 지금 공유하지 않으면 순위가 더 내려갈 수 있어요
@@ -804,54 +954,12 @@ export default function ResultScreen({ result, gender, onRestart }: ResultScreen
 
       {/* 모바일 이미지 길게 눌러 저장 유도 모달 */}
       <AnimatePresence>
-        {mobileSaveImage && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/95 backdrop-blur-md">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="relative w-full max-w-sm rounded-3xl p-6 overflow-hidden flex flex-col items-center"
-              style={{
-                background: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.37)',
-              }}
-            >
-              <button
-                onClick={closeMobileSaveModal}
-                className="absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors pointer-events-auto"
-              >
-                <X className="w-4 h-4 text-white" />
-              </button>
-
-              <div className="text-center mt-2 mb-4">
-                <h3 className="text-[18px] font-bold text-white mb-1">
-                  {mobileSaveContext === 'instagram' ? '인스타 스토리 공유하기' : '갤러리(사진첩)에 저장하기'}
-                </h3>
-                <p className="text-[12px] text-white/60">
-                  아래 이미지를 꾹 누르면 저장 메뉴가 나타납니다.
-                </p>
-              </div>
-
-              {/* 이미지 꾹 누르기 프레임 */}
-              <div className="relative w-full aspect-[9/16] max-h-[50vh] rounded-2xl overflow-y-auto border border-white/10 bg-black/40 shadow-inner flex items-start justify-center p-2 mb-4 pointer-events-auto">
-                <img
-                  src={mobileSaveImage}
-                  alt="결과 화면"
-                  className="w-full h-auto rounded-lg select-all object-contain"
-                  style={{ WebkitTouchCallout: 'default' }}
-                />
-              </div>
-
-              <div className="w-full text-center py-2 px-4 rounded-xl bg-white/5 border border-white/5 animate-pulse">
-                <span className="text-[12px] text-red-400 font-semibold">
-                  {mobileSaveContext === 'instagram' 
-                    ? '💡 이미지를 3초간 길게 눌러 저장 후, 인스타 스토리에서 업로드하세요!' 
-                    : '💡 이미지를 3초간 길게 눌러 사진 앱에 추가하세요'}
-                </span>
-              </div>
-            </motion.div>
-          </div>
+        {mobileSaveImage && mobileSaveContext && (
+          <MobileSaveModal
+            imageUrl={mobileSaveImage}
+            context={mobileSaveContext}
+            onClose={closeMobileSaveModal}
+          />
         )}
       </AnimatePresence>
     </div>
