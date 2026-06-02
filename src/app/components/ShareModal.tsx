@@ -3,11 +3,12 @@ import { motion, AnimatePresence } from 'motion/react';
 import { X, Download, Link as LinkIcon, Check, Share, MessageCircle, Loader2 } from 'lucide-react';
 import { logGAEvent } from '../utils/analytics';
 import { logUserEvent } from '../utils/apiClient';
+import { createResultImageBlob } from '../utils/resultImage';
+import type { ResultImageData } from '../utils/resultImage';
 
 interface ShareModalProps {
   isOpen: boolean;
   onClose: () => void;
-  resultScreenRef: React.RefObject<HTMLDivElement>;
   resultData: {
     percentile: number;
     grade: string;
@@ -21,6 +22,7 @@ interface ShareModalProps {
       name: string;
       rarity: number;
     };
+    imageData: ResultImageData;
   };
 }
 
@@ -32,7 +34,7 @@ const InstagramIcon = ({ className = "w-6 h-6" }: { className?: string }) => (
   </svg>
 );
 
-export default function ShareModal({ isOpen, onClose, resultScreenRef, resultData }: ShareModalProps) {
+export default function ShareModal({ isOpen, onClose, resultData }: ShareModalProps) {
   const [shareUrl, setShareUrl] = useState('');
   const [copied, setCopied] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
@@ -49,6 +51,18 @@ export default function ShareModal({ isOpen, onClose, resultScreenRef, resultDat
     }
   };
 
+  const downloadImageBlob = (blob: Blob, fileName: string) => {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.download = fileName;
+    link.href = url;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
   useEffect(() => {
     if (isOpen) {
       logGAEvent('share_modal_opened', 'engagement', 'Share Modal');
@@ -63,53 +77,19 @@ export default function ShareModal({ isOpen, onClose, resultScreenRef, resultDat
     }
   }, [isOpen]);
 
-  /**
-   * 결과 화면 전체를 이미지로 캡처
-   * resultScreenRef가 가리키는 전체 결과 영역을 고품질로 캡처
-   */
   const captureResultImage = useCallback(async (): Promise<Blob | null> => {
-    if (!resultScreenRef.current) return null;
-
     try {
       setIsCapturing(true);
-
-      // 캡처 전에 스크롤 위치 저장
-      const scrollParent = resultScreenRef.current.closest('.overflow-y-auto') || window;
-      const prevScroll = scrollParent instanceof Window ? window.scrollY : (scrollParent as HTMLElement).scrollTop;
-
-      const html2canvas = (await import('html2canvas')).default;
-      const canvas = await html2canvas(resultScreenRef.current, {
-        backgroundColor: '#000000',
-        scale: 2,
-        logging: false,
-        useCORS: true,
-        allowTaint: true,
-        // 전체 높이를 캡처하도록 scrollY를 0으로
-        windowHeight: resultScreenRef.current.scrollHeight,
-        height: resultScreenRef.current.scrollHeight,
-        y: 0,
-      });
-
-      // 스크롤 위치 복원
-      if (scrollParent instanceof Window) {
-        window.scrollTo(0, prevScroll);
-      } else {
-        (scrollParent as HTMLElement).scrollTop = prevScroll;
-      }
-
-      return new Promise((resolve) => {
-        canvas.toBlob((blob) => {
-          setImageBlob(blob);
-          setIsCapturing(false);
-          resolve(blob);
-        }, 'image/png', 1.0);
-      });
+      const blob = await createResultImageBlob(resultData.imageData);
+      setImageBlob(blob);
+      setIsCapturing(false);
+      return blob;
     } catch (error) {
       console.error('Failed to capture result image:', error);
       setIsCapturing(false);
       return null;
     }
-  }, [resultScreenRef]);
+  }, [resultData.imageData]);
 
   /**
    * 인스타그램 스토리 공유 (이미지 파일 전달)
@@ -211,7 +191,7 @@ export default function ShareModal({ isOpen, onClose, resultScreenRef, resultDat
   };
 
   /**
-   * 이미지 다운로드 - 결과 페이지 전체를 이미지로 저장
+   * 이미지 다운로드 - 결과 페이지 상단부터 전략 카드까지 저장
    */
   const handleDownloadImage = async () => {
     logGAEvent('image_save_modal_clicked', 'engagement', 'Share Modal');
@@ -223,36 +203,14 @@ export default function ShareModal({ isOpen, onClose, resultScreenRef, resultDat
     if (!blob) return;
 
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    const fileName = `순위테스트-결과-상위${resultData.percentile}%-${Date.now()}.png`;
+
+    downloadImageBlob(blob, fileName);
 
     if (isMobile) {
-      try {
-        const file = new File([blob], `rank-result-${Date.now()}.png`, { type: 'image/png' });
-        if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-          await navigator.share({
-            files: [file],
-            title: '전국 순위 테스트 결과 저장',
-          });
-          return;
-        }
-      } catch (shareErr) {
-        if ((shareErr as Error).name === 'AbortError') return; // User cancelled
-        console.warn('Native share failed, fallback to modal:', shareErr);
-      }
-
-      // Fallback to long-press modal
       const url = URL.createObjectURL(blob);
       setMobileSaveImage(url);
-    } else {
-      // Desktop download
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.download = `순위테스트-결과-상위${resultData.percentile}%-${Date.now()}.png`;
-      link.href = url;
-      link.style.display = 'none';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      setMobileSaveContext('save');
     }
   };
 
