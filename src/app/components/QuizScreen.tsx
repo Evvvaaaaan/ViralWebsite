@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import type { Gender, QuizAnswer } from '../types';
-import { getQuestions } from '../data/questions';
+import { getQuestionOptions, getQuestionScore, getQuestions } from '../data/questions';
 import { getCurrentOnlineUsers } from '../utils/engagement';
 import { Users } from 'lucide-react';
 import { logGAEvent } from '../utils/analytics';
@@ -12,19 +12,23 @@ interface QuizScreenProps {
   ageGroup: string;
   onComplete: (answers: QuizAnswer[]) => void;
   initialAnswers: QuizAnswer[];
+  initialQuestionIndex?: number;
 }
 
 const categories = [
   { name: '자기관리', range: [1, 5] },
-  { name: '경제력', range: [6, 10] },
-  { name: '사회성', range: [11, 15] },
-  { name: '라이프스타일', range: [16, 20] },
-  { name: '마인드셋', range: [21, 25] },
+  { name: '마인드셋', range: [6, 10] },
+  { name: '경제력', range: [11, 15] },
+  { name: '사회성', range: [16, 20] },
+  { name: '라이프스타일', range: [21, 25] },
 ];
 
-export default function QuizScreen({ gender, ageGroup, onComplete, initialAnswers }: QuizScreenProps) {
-  const [currentQuestion, setCurrentQuestion] = useState(0);
+export default function QuizScreen({ gender, ageGroup, onComplete, initialAnswers, initialQuestionIndex = 0 }: QuizScreenProps) {
   const [answers, setAnswers] = useState<QuizAnswer[]>(initialAnswers);
+  const questionsList = getQuestions(ageGroup);
+  const [currentQuestion, setCurrentQuestion] = useState(() =>
+    Math.max(0, Math.min(initialQuestionIndex, questionsList.length - 1)),
+  );
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [socialFeedback, setSocialFeedback] = useState<string | null>(null);
   const [showSectionCard, setShowSectionCard] = useState(false);
@@ -33,11 +37,8 @@ export default function QuizScreen({ gender, ageGroup, onComplete, initialAnswer
   const [showExitWarning, setShowExitWarning] = useState(false);
   const [currentOnline, setCurrentOnline] = useState(0);
 
-  const questionsList = getQuestions(ageGroup);
   const question = questionsList[currentQuestion];
-  const options = question.genderSpecificOptions
-    ? (gender === 'male' ? question.genderSpecificOptions.male : question.genderSpecificOptions.female)
-    : question.options;
+  const options = getQuestionOptions(question, gender);
 
   // 동시 참여자 수 업데이트 (5초마다 변동)
   useEffect(() => {
@@ -141,7 +142,7 @@ export default function QuizScreen({ gender, ageGroup, onComplete, initialAnswer
 
     // Auto-advance after 1000ms (Increased to give more reading time)
     setTimeout(() => {
-      const score = question.isReverse ? (optionIndex + 1) : (5 - optionIndex);
+      const score = getQuestionScore(question, optionIndex, gender);
       const newAnswers = [
         ...answers.filter(a => a.questionId !== question.id),
         { questionId: question.id, answer: score },

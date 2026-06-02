@@ -1,3 +1,7 @@
+import type { Gender } from '../types';
+
+export type ResultCategoryKey = 'selfCare' | 'economy' | 'social' | 'lifestyle' | 'mindset';
+
 export interface Question {
   id: number;
   category: '자기관리' | '경제력' | '사회성' | '라이프스타일' | '마인드셋';
@@ -6,11 +10,40 @@ export interface Question {
   options: string[];
   type: 'scale' | 'likert'; // 척도형(객관) vs 리커트형(주관)
   scaleType?: 'grid' | 'slider' | 'list'; // UI 렌더링 유형
-  isReverse?: boolean; // 역채점 여부 (높을수록 나쁜 것 - 술, 담배, SNS 등)
+  optionScores?: number[]; // 선택지별 직접 점수 매핑
   genderSpecificOptions?: { // 성별에 따른 선택지 분기 (예: 키 문항)
     male: string[];
     female: string[];
   };
+  genderSpecificOptionScores?: {
+    male: number[];
+    female: number[];
+  };
+}
+
+export const resultCategoryMap: Record<Question['category'], ResultCategoryKey> = {
+  자기관리: 'selfCare',
+  경제력: 'economy',
+  사회성: 'social',
+  라이프스타일: 'lifestyle',
+  마인드셋: 'mindset',
+};
+
+export function getQuestionOptions(question: Question, gender: Gender): string[] {
+  if (!question.genderSpecificOptions) return question.options;
+  return gender === 'male'
+    ? question.genderSpecificOptions.male
+    : question.genderSpecificOptions.female;
+}
+
+export function getQuestionScore(question: Question, optionIndex: number, gender: Gender): number {
+  const optionScores = question.genderSpecificOptionScores
+    ? (gender === 'male'
+        ? question.genderSpecificOptionScores.male
+        : question.genderSpecificOptionScores.female)
+    : question.optionScores;
+
+  return optionScores?.[optionIndex] ?? (optionIndex + 1);
 }
 
 // 1. 성인용 공통 25문항 데이터베이스
@@ -29,18 +62,20 @@ export const adultQuestions: Question[] = [
         '165cm 이하',
         '166~170cm',
         '171~175cm',
-        '176~180cm',
-        '181~185cm',
-        '186cm 이상',
+        '176~180cm 아래',
+        '180cm 이상',
       ],
       female: [
-        '155cm 이하',
-        '156~160cm',
-        '161~165cm',
-        '166~170cm',
-        '171~175cm',
-        '176cm 이상',
+        '150cm 이하',
+        '151~159cm',
+        '160~166cm',
+        '167~174cm',
+        '175cm 이상',
       ]
+    },
+    genderSpecificOptionScores: {
+      male: [1, 2, 3, 4, 5],
+      female: [1, 4, 5, 4, 3],
     }
   },
   {
@@ -98,30 +133,28 @@ export const adultQuestions: Question[] = [
     ],
   },
 
-  // 2. 생활습관·인성 (Q6~Q10)
+  // 2. 마인드셋·자기통제 (Q6~Q10)
   {
     id: 6,
-    category: '생활습관', // 실제 매핑 시에는 '자기관리' 파트에 흡수되거나 백엔드 매핑 지원
+    category: '마인드셋',
     categoryEmoji: '🌟',
     question: '한 달에 술(음주)을 몇 번 마시나요?',
     type: 'scale',
     scaleType: 'slider',
-    isReverse: true, // 역채점 (안 마실수록 높은 점수)
     options: ['거의 매일', '주 1~2회 (월 4~8회)', '월 3~5회', '월 1~2회', '전혀 안 마심 (0회)'],
   },
   {
     id: 7,
-    category: '자기관리',
+    category: '마인드셋',
     categoryEmoji: '🚬',
     question: '현재 담배(전자담배·액상 포함)를 피우시나요?',
     type: 'scale',
     scaleType: 'slider',
-    isReverse: true, // 역채점 (비흡연일수록 높은 점수)
     options: ['매일 핌', '가끔 핌 (월 수회)', '끊은 지 1년 미만', '끊은 지 1년 이상', '전혀 안 핌 (비흡연)'],
   },
   {
     id: 8,
-    category: '자기관리',
+    category: '마인드셋',
     categoryEmoji: '❤️',
     question: '평소 대화나 메시지를 보낼 때 욕설이나 비속어를 쓰지 않는다.',
     type: 'likert',
@@ -129,7 +162,7 @@ export const adultQuestions: Question[] = [
   },
   {
     id: 9,
-    category: '자기관리',
+    category: '마인드셋',
     categoryEmoji: '❤️',
     question: '평소 자극적이거나 불필요한 영상(연예인 직캠 등)을 굳이 찾아보지 않는다.',
     type: 'likert',
@@ -137,7 +170,7 @@ export const adultQuestions: Question[] = [
   },
   {
     id: 10,
-    category: '자기관리',
+    category: '마인드셋',
     categoryEmoji: '❤️',
     question: '온라인 커뮤니티나 SNS 상에서 타인을 혐오하거나 비하하는 발언을 절대 하지 않는다.',
     type: 'likert',
@@ -238,7 +271,6 @@ export const adultQuestions: Question[] = [
     question: '하루 평균 스마트폰으로 유튜브, 쇼츠, SNS를 사용하는 시간은?',
     type: 'scale',
     scaleType: 'slider',
-    isReverse: true, // 역채점 (사용 시간이 적을수록 고득점)
     options: ['4시간 이상', '2~4시간', '1~2시간', '30분~1시간', '30분 이하'],
   },
   {
@@ -251,14 +283,15 @@ export const adultQuestions: Question[] = [
     options: [
       '5시간 이하 (만성 피로)',
       '6시간 내외',
-      '9시간 이상 (과수면)',
       '7시간 내외',
-      '8시간 내외'
+      '8시간 내외',
+      '9시간 이상 (과수면)'
     ],
+    optionScores: [1, 2, 4, 5, 3],
   },
   {
     id: 23,
-    category: '마인드셋',
+    category: '라이프스타일',
     categoryEmoji: '🗣️',
     question: '처음 만난 낯선 사람과도 어색함 없이 자연스럽고 유쾌하게 대화를 이끌어간다.',
     type: 'likert',
@@ -266,7 +299,7 @@ export const adultQuestions: Question[] = [
   },
   {
     id: 24,
-    category: '마인드셋',
+    category: '라이프스타일',
     categoryEmoji: '😀',
     question: '주변 지인들로부터 나와 대화하면 힐링이 되거나 매우 재미있다는 칭찬을 자주 듣는 편이다.',
     type: 'likert',
@@ -274,7 +307,7 @@ export const adultQuestions: Question[] = [
   },
   {
     id: 25,
-    category: '마인드셋',
+    category: '라이프스타일',
     categoryEmoji: '🎨',
     question: '단조로운 일상에 머물지 않고 나만의 다양한 취미 활동과 뚜렷한 관심사를 가지고 몰두한다.',
     type: 'likert',
@@ -298,18 +331,20 @@ export const teenQuestions: Question[] = [
         '165cm 이하',
         '166~170cm',
         '171~175cm',
-        '176~180cm',
-        '181~185cm',
-        '186cm 이상',
+        '176~180cm 아래',
+        '180cm 이상',
       ],
       female: [
-        '155cm 이하',
-        '156~160cm',
-        '161~165cm',
-        '166~170cm',
-        '171~175cm',
-        '176cm 이상',
+        '150cm 이하',
+        '151~159cm',
+        '160~166cm',
+        '167~174cm',
+        '175cm 이상',
       ]
+    },
+    genderSpecificOptionScores: {
+      male: [1, 2, 3, 4, 5],
+      female: [1, 4, 5, 4, 3],
     }
   },
   {
@@ -367,30 +402,28 @@ export const teenQuestions: Question[] = [
     ],
   },
 
-  // 2. 생활습관·인성 (Q6~Q10) - 공통
+  // 2. 마인드셋·자기통제 (Q6~Q10) - 공통
   {
     id: 6,
-    category: '생활습관',
+    category: '마인드셋',
     categoryEmoji: '🌟',
     question: '한 달에 술(음주)을 몇 번 마시나요?',
     type: 'scale',
     scaleType: 'slider',
-    isReverse: true,
     options: ['거의 매일', '주 1~2회 (월 4~8회)', '월 3~5회', '월 1~2회', '전혀 안 마심 (0회)'],
   },
   {
     id: 7,
-    category: '자기관리',
+    category: '마인드셋',
     categoryEmoji: '🚬',
     question: '현재 담배(전자담배·액상 포함)를 피우시나요?',
     type: 'scale',
     scaleType: 'slider',
-    isReverse: true,
     options: ['매일 핌', '가끔 핌 (월 수회)', '끊은 지 1년 미만', '끊은 지 1년 이상', '전혀 안 핌 (비흡연)'],
   },
   {
     id: 8,
-    category: '자기관리',
+    category: '마인드셋',
     categoryEmoji: '❤️',
     question: '평소 대화나 메시지를 보낼 때 욕설이나 비속어를 쓰지 않는다.',
     type: 'likert',
@@ -398,7 +431,7 @@ export const teenQuestions: Question[] = [
   },
   {
     id: 9,
-    category: '자기관리',
+    category: '마인드셋',
     categoryEmoji: '❤️',
     question: '평소 자극적이거나 불필요한 영상(연예인 직캠 등)을 굳이 찾아보지 않는다.',
     type: 'likert',
@@ -406,7 +439,7 @@ export const teenQuestions: Question[] = [
   },
   {
     id: 10,
-    category: '자기관리',
+    category: '마인드셋',
     categoryEmoji: '❤️',
     question: '온라인 커뮤니티나 SNS 상에서 타인을 혐오하거나 비하하는 발언을 절대 하지 않는다.',
     type: 'likert',
@@ -436,7 +469,6 @@ export const teenQuestions: Question[] = [
     question: '하루 평균 스마트폰 사용 및 게임 플레이 시간은 어떻게 되나요?',
     type: 'scale',
     scaleType: 'slider',
-    isReverse: true, // 역채점 (시간이 적을수록 건강한 삶)
     options: ['6시간 이상', '4~6시간', '2~4시간', '1~2시간', '1시간 이하'],
   },
   {
@@ -446,7 +478,6 @@ export const teenQuestions: Question[] = [
     question: '평일 저녁 취침 시간(자는 시각)은 대체로 몇 시인가요?',
     type: 'scale',
     scaleType: 'grid',
-    isReverse: true, // 역채점 (자정을 넘기지 않고 일찍 잘수록 고득점)
     options: ['새벽 2시 이후', '새벽 1~2시', '자정~새벽 1시', '밤 11시~자정', '밤 11시 이전'],
   },
   {
@@ -517,7 +548,6 @@ export const teenQuestions: Question[] = [
     question: '하루 평균 스마트폰으로 유튜브, 쇼츠, SNS를 사용하는 시간은?',
     type: 'scale',
     scaleType: 'slider',
-    isReverse: true,
     options: ['4시간 이상', '2~4시간', '1~2시간', '30분~1시간', '30분 이하'],
   },
   {
@@ -530,14 +560,15 @@ export const teenQuestions: Question[] = [
     options: [
       '5시간 이하 (만성 피로)',
       '6시간 내외',
-      '9시간 이상 (과수면)',
       '7시간 내외',
-      '8시간 내외'
+      '8시간 내외',
+      '9시간 이상 (과수면)'
     ],
+    optionScores: [1, 2, 4, 5, 3],
   },
   {
     id: 23,
-    category: '마인드셋',
+    category: '라이프스타일',
     categoryEmoji: '🗣️',
     question: '처음 만난 낯선 사람과도 어색함 없이 자연스럽고 유쾌하게 대화를 이끌어간다.',
     type: 'likert',
@@ -545,7 +576,7 @@ export const teenQuestions: Question[] = [
   },
   {
     id: 24,
-    category: '마인드셋',
+    category: '라이프스타일',
     categoryEmoji: '😀',
     question: '주변 지인들로부터 나와 대화하면 힐링이 되거나 매우 재미있다는 칭찬을 자주 듣는 편이다.',
     type: 'likert',
@@ -553,7 +584,7 @@ export const teenQuestions: Question[] = [
   },
   {
     id: 25,
-    category: '마인드셋',
+    category: '라이프스타일',
     categoryEmoji: '🎨',
     question: '단조로운 일상에 머물지 않고 나만의 다양한 취미 활동과 뚜렷한 관심사를 가지고 몰두한다.',
     type: 'likert',
