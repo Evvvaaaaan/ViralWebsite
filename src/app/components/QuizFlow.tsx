@@ -128,13 +128,7 @@ export default function QuizFlow() {
         calculatedResult.id = id;
 
         // 등급 재계산 (실제 순위 기반)
-        const percentile = rankings.national;
-        if (percentile <= 1) calculatedResult.grade = 'S';
-        else if (percentile <= 5) calculatedResult.grade = 'A';
-        else if (percentile <= 15) calculatedResult.grade = 'B';
-        else if (percentile <= 40) calculatedResult.grade = 'C';
-        else if (percentile <= 70) calculatedResult.grade = 'D';
-        else calculatedResult.grade = 'F';
+        calculatedResult.grade = gradeFromPercentile(rankings.national);
       }
     } catch (error) {
       console.error('Failed to submit result to server:', error);
@@ -219,6 +213,15 @@ export default function QuizFlow() {
   );
 }
 
+function gradeFromPercentile(percentile: number): 'S' | 'A' | 'B' | 'C' | 'D' | 'F' {
+  if (percentile <= 1) return 'S';
+  if (percentile <= 5) return 'A';
+  if (percentile <= 15) return 'B';
+  if (percentile <= 40) return 'C';
+  if (percentile <= 70) return 'D';
+  return 'F';
+}
+
 function normalCDF(x: number, mean: number, stdDev: number): number {
   const z = (x - mean) / stdDev;
   const t = 1 / (1 + 0.2316419 * Math.abs(z));
@@ -274,14 +277,7 @@ function calculateResult(answers: QuizAnswer[], gender: Gender, ageGroup: string
   const cdfVal = normalCDF(total, mean, stdDev);
   const percentile = Math.max(0.1, Math.min(99.9, parseFloat(((1 - cdfVal) * 100).toFixed(1))));
 
-  // Determine grade based on percentile
-  let grade: 'S' | 'A' | 'B' | 'C' | 'D' | 'F';
-  if (percentile <= 1) grade = 'S';
-  else if (percentile <= 5) grade = 'A';
-  else if (percentile <= 15) grade = 'B';
-  else if (percentile <= 40) grade = 'C';
-  else if (percentile <= 70) grade = 'D';
-  else grade = 'F';
+  const grade = gradeFromPercentile(percentile);
 
   return {
     percentile,

@@ -32,8 +32,6 @@ export const initGA = (measurementId: string) => {
     window.gtag('config', measurementId, {
       send_page_view: true, // 페이지뷰 자동 로깅
     });
-
-    console.log(`[Analytics] Google Analytics 4 (${measurementId}) 초기화 성공`);
   } catch (error) {
     console.error('[Analytics] GA4 초기화 실패:', error);
   }
@@ -59,7 +57,6 @@ export const logGAEvent = (
         event_label: label,
         value: value,
       });
-      console.log(`[Analytics] GA4 Event Logged: ${action}`, { category, label, value });
     } catch (error) {
       console.error('[Analytics] GA4 이벤트 로깅 실패:', error);
     }
