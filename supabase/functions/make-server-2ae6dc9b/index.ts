@@ -25,14 +25,14 @@ app.get("/make-server-2ae6dc9b/health", (c) => {
 });
 
 // 목업 카테고리 점수 생성 (실제 유저와 동일한 5~25점 범위)
-// 평균이 약 12~14점이 되도록 실제 문항 응답 가중치를 부여한 종형 분포 적용
+// 평균이 약 11.25점(총점 56.25점, 10점 만점 기준 약 4.5점)이 되도록 정규분포 가중치 적용
 function generateMockScore(): number {
   let score = 0;
   for (let i = 0; i < 5; i++) {
     const rand = Math.random();
-    if (rand < 0.20) score += 1;
-    else if (rand < 0.50) score += 2;
-    else if (rand < 0.80) score += 3;
+    if (rand < 0.30) score += 1;
+    else if (rand < 0.65) score += 2;
+    else if (rand < 0.85) score += 3;
     else if (rand < 0.95) score += 4;
     else score += 5;
   }
@@ -49,34 +49,46 @@ function generateMockCategories() {
   };
 }
 
-// 목업 데이터 초기화
+// 목업 데이터 초기화 (배치 처리를 통한 만개 이상 고속 삽입 지원)
 app.post("/make-server-2ae6dc9b/init-mock-data", async (c) => {
   try {
-    const mockCount = 2000;
-    const regions = ['서울/경기', '부산', '대구', '인천', '광주', '대전', '울산', '세종', '기타'];
+    const mockCount = 10000;
+    const batchSize = 1000;
+    const regions = ['서울/경기', '부산', '대구', '인천', '광주', '대전', '울산', '세종', '충남', '충북', '전남', '전북', '경남', '경북', '강원', '제주'];
     const ageGroups = ['10대', '20대', '30대', '40대', '50대 이상'];
 
-    console.log(`Generating ${mockCount} mock data entries...`);
+    console.log(`Generating ${mockCount} mock data entries in batches of ${batchSize}...`);
 
-    for (let i = 0; i < mockCount; i++) {
-      const categories = generateMockCategories();
-      const total = Object.values(categories).reduce((sum: number, val) => sum + val, 0);
-      const gender = Math.random() > 0.5 ? 'male' : 'female';
-      const region = regions[Math.floor(Math.random() * regions.length)];
-      const ageGroup = ageGroups[Math.floor(Math.random() * ageGroups.length)];
+    for (let b = 0; b < mockCount; b += batchSize) {
+      const keys: string[] = [];
+      const values: any[] = [];
+      const currentBatchSize = Math.min(batchSize, mockCount - b);
 
-      const mockData = {
-        id: `mock-${i}`,
-        gender,
-        total,
-        categories,
-        timestamp: Date.now() - Math.floor(Math.random() * 30 * 24 * 60 * 60 * 1000),
-        isMock: true,
-        region,
-        ageGroup,
-      };
+      for (let i = 0; i < currentBatchSize; i++) {
+        const globalIdx = b + i;
+        const categories = generateMockCategories();
+        const total = Object.values(categories).reduce((sum: number, val) => sum + val, 0);
+        const gender = Math.random() > 0.5 ? 'male' : 'female';
+        const region = regions[Math.floor(Math.random() * regions.length)];
+        const ageGroup = ageGroups[Math.floor(Math.random() * ageGroups.length)];
 
-      await kv.set(`result:mock-${i}`, mockData);
+        const mockData = {
+          id: `mock-${globalIdx}`,
+          gender,
+          total,
+          categories,
+          timestamp: Date.now() - Math.floor(Math.random() * 30 * 24 * 60 * 60 * 1000),
+          isMock: true,
+          region,
+          ageGroup,
+        };
+
+        keys.push(`result:mock-${globalIdx}`);
+        values.push(mockData);
+      }
+
+      await kv.mset(keys, values);
+      console.log(`Inserted batch ${b} to ${b + currentBatchSize}`);
     }
 
     console.log(`Successfully generated ${mockCount} mock data entries`);
