@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import type { Gender, QuizAnswer } from '../types';
-import { getQuestionOptions, getQuestionScore, getQuestions } from '../data/questions';
+import { getQuestionOptions, getQuestionScore, getQuestionText, getQuestions, type Question } from '../data/questions';
 import { getCurrentOnlineUsers } from '../utils/engagement';
 import { Users } from 'lucide-react';
 import { logGAEvent } from '../utils/analytics';
@@ -247,6 +247,7 @@ export default function QuizScreen({ gender, ageGroup, onComplete, initialAnswer
                 question={question}
                 questionNumber={currentQuestion + 1}
                 totalQuestions={questionsList.length}
+                gender={gender}
                 options={options}
                 selectedOption={selectedOption}
                 socialFeedback={socialFeedback}
@@ -297,9 +298,10 @@ export default function QuizScreen({ gender, ageGroup, onComplete, initialAnswer
 }
 
 interface QuestionCardProps {
-  question: any;
+  question: Question;
   questionNumber: number;
   totalQuestions: number;
+  gender: Gender;
   options: string[];
   selectedOption: number | null;
   socialFeedback: string | null;
@@ -314,6 +316,7 @@ function QuestionCard({
   question,
   questionNumber,
   totalQuestions,
+  gender,
   options,
   selectedOption,
   socialFeedback,
@@ -325,6 +328,7 @@ function QuestionCard({
 }: QuestionCardProps) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [localSelected, setLocalSelected] = useState<number | null>(null);
+  const questionText = getQuestionText(question, gender);
 
   useEffect(() => {
     setLocalSelected(selectedOption);
@@ -783,7 +787,7 @@ function QuestionCard({
           color: textColor,
         }}
       >
-        {question.question}
+        {questionText}
       </h2>
 
       {renderContent()}
