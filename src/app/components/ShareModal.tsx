@@ -6,6 +6,7 @@ import html2canvas from 'html2canvas';
 interface ShareModalProps {
   isOpen: boolean;
   onClose: () => void;
+  resultScreenRef: React.RefObject<HTMLDivElement>;
   resultData: {
     percentile: number;
     grade: string;
@@ -22,7 +23,7 @@ interface ShareModalProps {
   };
 }
 
-export default function ShareModal({ isOpen, onClose, resultData }: ShareModalProps) {
+export default function ShareModal({ isOpen, onClose, resultScreenRef, resultData }: ShareModalProps) {
   const [shareUrl, setShareUrl] = useState('');
   const [copied, setCopied] = useState(false);
   const [imageDataUrl, setImageDataUrl] = useState<string | null>(null);
@@ -40,138 +41,22 @@ export default function ShareModal({ isOpen, onClose, resultData }: ShareModalPr
   }, [isOpen, resultData]);
 
   const generateShareImage = async () => {
-    // Create a canvas with the result - optimized for social media (1.91:1 ratio)
-    const canvas = document.createElement('canvas');
-    canvas.width = 1200;
-    canvas.height = 630; // Optimized for Facebook, Twitter, LinkedIn
+    if (!resultScreenRef.current) return;
 
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    try {
+      // Capture the actual result screen using html2canvas
+      const canvas = await html2canvas(resultScreenRef.current, {
+        backgroundColor: '#000000',
+        scale: 2, // Higher quality
+        logging: false,
+        useCORS: true,
+        allowTaint: true,
+      });
 
-    // Background gradient - more dramatic
-    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-    gradient.addColorStop(0, '#0a0a0a');
-    gradient.addColorStop(0.5, '#1a1a2e');
-    gradient.addColorStop(1, '#000000');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Add glow effect for top grades
-    if (['S', 'A', 'B'].includes(resultData.grade)) {
-      const glowGradient = ctx.createRadialGradient(
-        canvas.width / 2,
-        canvas.height / 2,
-        0,
-        canvas.width / 2,
-        canvas.height / 2,
-        400
-      );
-      glowGradient.addColorStop(0, `${resultData.gradeConfig.color}40`);
-      glowGradient.addColorStop(1, 'transparent');
-      ctx.fillStyle = glowGradient;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      setImageDataUrl(canvas.toDataURL('image/png'));
+    } catch (error) {
+      console.error('Failed to generate share image:', error);
     }
-
-    // Left side - Result display
-    const leftWidth = canvas.width * 0.55;
-
-    // User type name as title
-    const typeTitle = resultData.userType?.name || '대한민국 순위';
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-    ctx.font = 'bold 52px Inter, sans-serif';
-    ctx.textAlign = 'left';
-    ctx.fillText(typeTitle, 60, 120);
-
-    // Rarity badge
-    if (resultData.userType) {
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-      ctx.font = '400 32px Inter, sans-serif';
-      ctx.fillText(`전체 ${resultData.userType.rarity}%`, 60, 165);
-    }
-
-    // Main percentage - bigger and bolder
-    ctx.fillStyle = resultData.gradeConfig.color;
-    ctx.font = 'bold 140px Inter, sans-serif';
-    ctx.shadowColor = resultData.gradeConfig.color;
-    ctx.shadowBlur = 40;
-    ctx.fillText(`상위 ${resultData.percentile}%`, 60, 320);
-
-    // Reset shadow
-    ctx.shadowBlur = 0;
-
-    // Grade badge - left aligned
-    ctx.fillStyle = resultData.gradeConfig.color;
-    ctx.font = 'bold 56px Inter, sans-serif';
-    ctx.fillText(`${resultData.gradeConfig.label} 등급`, 60, 400);
-
-    // Provocative challenge message
-    let challengeMsg = '';
-    if (resultData.percentile <= 5) {
-      challengeMsg = '이길 자신 있어?';
-    } else if (resultData.percentile <= 15) {
-      challengeMsg = '너도 도전해봐';
-    } else if (resultData.percentile <= 40) {
-      challengeMsg = '나보다 잘할 수 있어?';
-    } else {
-      challengeMsg = '네 순위는 어떨까?';
-    }
-
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-    ctx.font = '500 38px Inter, sans-serif';
-    ctx.fillText(challengeMsg, 60, 490);
-
-    // Right side - Visual impact
-    const rightX = leftWidth + 80;
-
-    // Decorative element - vertical bars showing rank
-    const barCount = 10;
-    const barWidth = 35;
-    const barGap = 15;
-    const barStartY = 100;
-    const barMaxHeight = 400;
-
-    for (let i = 0; i < barCount; i++) {
-      const isHighlighted = i === Math.floor(resultData.percentile / 10);
-      const barHeight = barMaxHeight * (1 - i / barCount);
-      const x = rightX + i * (barWidth + barGap);
-      const y = barStartY + (barMaxHeight - barHeight);
-
-      ctx.fillStyle = isHighlighted
-        ? resultData.gradeConfig.color
-        : 'rgba(255, 255, 255, 0.1)';
-
-      if (isHighlighted) {
-        ctx.shadowColor = resultData.gradeConfig.color;
-        ctx.shadowBlur = 20;
-      }
-
-      // Rounded rectangle
-      const radius = 8;
-      ctx.beginPath();
-      ctx.moveTo(x + radius, y);
-      ctx.lineTo(x + barWidth - radius, y);
-      ctx.arcTo(x + barWidth, y, x + barWidth, y + radius, radius);
-      ctx.lineTo(x + barWidth, y + barHeight - radius);
-      ctx.arcTo(x + barWidth, y + barHeight, x + barWidth - radius, y + barHeight, radius);
-      ctx.lineTo(x + radius, y + barHeight);
-      ctx.arcTo(x, y + barHeight, x, y + barHeight - radius, radius);
-      ctx.lineTo(x, y + radius);
-      ctx.arcTo(x, y, x + radius, y, radius);
-      ctx.closePath();
-      ctx.fill();
-
-      if (isHighlighted) {
-        ctx.shadowBlur = 0;
-      }
-    }
-
-    // Bottom CTA
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-    ctx.font = '400 28px Inter, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('👉 전국 순위 테스트', canvas.width / 2, 580);
-
-    setImageDataUrl(canvas.toDataURL('image/png'));
   };
 
   const handleCopyLink = async () => {

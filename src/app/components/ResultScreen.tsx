@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer } from 'recharts';
 import { Crown, Diamond, Star, Sparkles, BarChart3, Sprout, Gem, Target, TrendingUp, Share2, MessageCircle, User, UserCircle, Dumbbell, Wallet, Users, Compass, Brain, MapPin, CalendarDays } from 'lucide-react';
@@ -93,6 +93,7 @@ export default function ResultScreen({ result, gender, onRestart }: ResultScreen
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [showRankChange, setShowRankChange] = useState(false);
   const [newPercentile, setNewPercentile] = useState(result.percentile);
+  const resultScreenRef = useRef<HTMLDivElement>(null);
   const grade = gradeConfig[result.grade as keyof typeof gradeConfig];
   const isTopRank = result.grade === 'S';
 
@@ -240,7 +241,7 @@ export default function ResultScreen({ result, gender, onRestart }: ResultScreen
         </div>
       )}
 
-      <div className="max-w-2xl mx-auto px-6 py-6 relative z-10 min-h-screen flex flex-col justify-center" style={{ background: '#000000' }}>
+      <div ref={resultScreenRef} className="max-w-2xl mx-auto px-6 py-6 relative z-10 min-h-screen flex flex-col justify-center" style={{ background: '#000000' }}>
         {/* Compact Hero Section */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -540,6 +541,7 @@ export default function ResultScreen({ result, gender, onRestart }: ResultScreen
       <ShareModal
         isOpen={shareModalOpen}
         onClose={() => setShareModalOpen(false)}
+        resultScreenRef={resultScreenRef}
         resultData={{
           percentile: result.percentile,
           grade: result.grade,
