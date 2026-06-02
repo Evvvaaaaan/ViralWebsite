@@ -73,9 +73,12 @@ export default function ShareModal({ isOpen, onClose, resultScreenRef, resultDat
     if (!imageDataUrl) return;
 
     const link = document.createElement('a');
-    link.download = `quiz-result-${resultData.percentile}.png`;
+    link.download = `personality-test-result-${Date.now()}.png`;
     link.href = imageDataUrl;
+    link.style.display = 'none';
+    document.body.appendChild(link);
     link.click();
+    document.body.removeChild(link);
   };
 
   const handleNativeShare = async () => {
@@ -244,7 +247,7 @@ export default function ShareModal({ isOpen, onClose, resultScreenRef, resultDat
                     color: '#000000',
                   }}
                 >
-                  카카오톡으로 "이거 이길 수 있어?" 보내기
+                  카카오톡으로 공유하기
                 </motion.button>
 
                 <motion.button
