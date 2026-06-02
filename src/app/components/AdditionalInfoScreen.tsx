@@ -33,8 +33,11 @@ const regions = [
 export default function AdditionalInfoScreen({ onComplete, onSkip, preselectedAgeGroup }: AdditionalInfoScreenProps) {
   const [region, setRegion] = useState<string | null>(null);
   const [ageGroup, setAgeGroup] = useState<string | null>(preselectedAgeGroup || null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     onComplete({ region, ageGroup });
   };
 
@@ -134,20 +137,37 @@ export default function AdditionalInfoScreen({ onComplete, onSkip, preselectedAg
           className="mb-8"
         >
           <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+            whileHover={isSubmitting ? {} : { scale: 1.02 }}
+            whileTap={isSubmitting ? {} : { scale: 0.98 }}
             onClick={handleSubmit}
+            disabled={isSubmitting}
             className="w-full py-5 rounded-full font-bold text-[18px] flex items-center justify-center gap-3"
             style={{
-              background: region
-                ? 'linear-gradient(135deg, #3B82F6, #8B5CF6)'
-                : 'rgba(255, 255, 255, 0.1)',
+              background: isSubmitting
+                ? 'rgba(255, 255, 255, 0.15)'
+                : region
+                  ? 'linear-gradient(135deg, #3B82F6, #8B5CF6)'
+                  : 'rgba(255, 255, 255, 0.1)',
               color: 'white',
-              border: region ? 'none' : '1px solid rgba(255, 255, 255, 0.2)',
+              border: region && !isSubmitting ? 'none' : '1px solid rgba(255, 255, 255, 0.2)',
+              cursor: isSubmitting ? 'not-allowed' : 'pointer',
             }}
           >
-            <span>{region ? '정확한 순위 확인하기' : '이대로 확인하기'}</span>
-            <ArrowRight className="w-5 h-5" />
+            {isSubmitting ? (
+              <>
+                <motion.span
+                  className="w-5 h-5 rounded-full border-2 border-white/30 border-t-white"
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
+                />
+                <span>로딩 중...</span>
+              </>
+            ) : (
+              <>
+                <span>{region ? '정확한 순위 확인하기' : '이대로 확인하기'}</span>
+                <ArrowRight className="w-5 h-5" />
+              </>
+            )}
           </motion.button>
 
           {!region ? (
