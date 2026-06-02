@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.env
+.env.local
+__figma__entrypoint__.ts
+*.log
+.DS_Store

@@ -1,0 +1,202 @@
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --font-size: 16px;
+
+  /* Cosmic Color Palette */
+  --cosmic-black: #000000;
+  --cosmic-base: #0a0a0f;
+  --cosmic-deep: #0f0c29;
+  --cosmic-mid: #302b63;
+  --cosmic-surface: #24243e;
+
+  /* Apple Colors (for Quiz screen) */
+  --action-blue: #0066cc;
+  --focus-blue: #0071e3;
+  --canvas: #ffffff;
+  --canvas-parchment: #f5f5f7;
+  --surface-tile-1: #272729;
+  --surface-tile-2: #2a2a2c;
+  --ink: #1d1d1f;
+  --body-on-dark: #ffffff;
+  --body-muted: #cccccc;
+  --ink-muted-48: #7a7a7a;
+  --ink-muted-80: #333333;
+  --hairline: #e0e0e0;
+  --divider-soft: #f0f0f0;
+  --rounded-lg: 18px;
+  --rounded-pill: 9999px;
+
+  /* Interaction Colors */
+  --cosmic-pink: #ff6496;
+  --cosmic-indigo: #6366f1;
+
+  /* Grade Colors */
+  --grade-s: #f5a623;
+  --grade-s-glow: rgba(245, 166, 35, 0.35);
+  --grade-a: #7b68ee;
+  --grade-a-glow: rgba(123, 104, 238, 0.3);
+  --grade-b: #00d4aa;
+  --grade-b-glow: rgba(0, 212, 170, 0.25);
+  --grade-c: #4fc3f7;
+  --grade-c-glow: rgba(79, 195, 247, 0.2);
+  --grade-d: #aaaaaa;
+  --grade-d-glow: rgba(170, 170, 170, 0.15);
+  --grade-f: #ff6b6b;
+  --grade-f-glow: rgba(255, 107, 107, 0.2);
+
+  /* Glass Morphism */
+  --glass-bg: rgba(255, 255, 255, 0.06);
+  --glass-bg-hover: rgba(255, 255, 255, 0.10);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-border-hover: rgba(255, 255, 255, 0.20);
+  --glass-border-active: rgba(255, 255, 255, 0.35);
+
+  /* Text Colors */
+  --text-primary: #ffffff;
+  --text-secondary: rgba(255, 255, 255, 0.65);
+  --text-tertiary: rgba(255, 255, 255, 0.35);
+  --text-on-light: #1d1d1f;
+
+  /* Animation */
+  --duration-instant: 80ms;
+  --duration-fast: 200ms;
+  --duration-moderate: 350ms;
+  --duration-slow: 600ms;
+  --duration-drama: 1200ms;
+
+  /* Legacy Tokens */
+  --background: var(--cosmic-black);
+  --foreground: var(--text-primary);
+  --card: var(--glass-bg);
+  --card-foreground: var(--text-primary);
+  --popover: var(--cosmic-surface);
+  --popover-foreground: var(--text-primary);
+  --primary: var(--cosmic-indigo);
+  --primary-foreground: var(--text-primary);
+  --secondary: var(--cosmic-surface);
+  --secondary-foreground: var(--text-primary);
+  --muted: var(--cosmic-surface);
+  --muted-foreground: var(--text-secondary);
+  --accent: var(--action-blue);
+  --accent-foreground: var(--text-primary);
+  --destructive: #d4183d;
+  --destructive-foreground: #ffffff;
+  --border: var(--glass-border);
+  --input: transparent;
+  --input-background: var(--glass-bg);
+  --switch-background: var(--glass-border);
+  --font-weight-medium: 500;
+  --font-weight-normal: 400;
+  --ring: var(--focus-blue);
+  --chart-1: var(--cosmic-indigo);
+  --chart-2: var(--cosmic-pink);
+  --chart-3: var(--grade-b);
+  --chart-4: var(--grade-c);
+  --chart-5: var(--grade-s);
+  --radius: 1.125rem;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-input-background: var(--input-background);
+  --color-switch-background: var(--switch-background);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  /* Cosmic Colors for Tailwind */
+  --color-cosmic-black: var(--cosmic-black);
+  --color-cosmic-base: var(--cosmic-base);
+  --color-cosmic-deep: var(--cosmic-deep);
+  --color-cosmic-mid: var(--cosmic-mid);
+  --color-cosmic-surface: var(--cosmic-surface);
+  --color-action-blue: var(--action-blue);
+  --color-cosmic-pink: var(--cosmic-pink);
+  --color-cosmic-indigo: var(--cosmic-indigo);
+  --color-glass-bg: var(--glass-bg);
+  --color-glass-border: var(--glass-border);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', -apple-system, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  html {
+    font-size: var(--font-size);
+  }
+
+  h1 {
+    font-size: var(--text-2xl);
+    font-weight: var(--font-weight-medium);
+    line-height: 1.5;
+  }
+
+  h2 {
+    font-size: var(--text-xl);
+    font-weight: var(--font-weight-medium);
+    line-height: 1.5;
+  }
+
+  h3 {
+    font-size: var(--text-lg);
+    font-weight: var(--font-weight-medium);
+    line-height: 1.5;
+  }
+
+  h4 {
+    font-size: var(--text-base);
+    font-weight: var(--font-weight-medium);
+    line-height: 1.5;
+  }
+
+  label {
+    font-size: var(--text-base);
+    font-weight: var(--font-weight-medium);
+    line-height: 1.5;
+  }
+
+  button {
+    font-size: var(--text-base);
+    font-weight: var(--font-weight-medium);
+    line-height: 1.5;
+  }
+
+  input {
+    font-size: var(--text-base);
+    font-weight: var(--font-weight-normal);
+    line-height: 1.5;
+  }
+}
