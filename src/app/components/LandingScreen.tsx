@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { motion } from "motion/react";
+import { color, motion } from "motion/react";
 import { Link } from "react-router";
 import {
   getTotalParticipants,
@@ -187,8 +187,12 @@ export default function LandingScreen({ onStart }: LandingScreenProps) {
           >
             <span className="text-white">나는 7의</span>
             <br />
-            <span className="text-white">남자 · 여자 인가</span>
-            <span style={{ color: "var(--action-blue)" }}>?</span>
+            <span className="text-white">
+              <span style={{ color: "var(--action-blue)" }}>남</span> ·{" "}
+              <span style={{ color: "var(--action-pink)" }}>여자</span>
+              인가
+            </span>
+            <span>?</span>
           </h1>
           <p className="text-[15px] sm:text-[17px] text-white/65 leading-[1.6] tracking-[-0.01em]">
             25개의 문항으로 확인하는
