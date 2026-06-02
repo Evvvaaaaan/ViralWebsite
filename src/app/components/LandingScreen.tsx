@@ -118,16 +118,16 @@ export default function LandingScreen({ onStart }: LandingScreenProps) {
         ))}
       </div>
 
-      {/* Blurred radar chart preview */}
-      <div className="absolute inset-0 flex items-center justify-center opacity-15 blur-[20px] pointer-events-none">
-        <svg width="300" height="300" viewBox="0 0 300 300">
-          <polygon
-            points="150,50 250,125 200,250 100,250 50,125"
-            fill="none"
-            stroke="rgba(99, 102, 241, 0.5)"
-            strokeWidth="2"
-          />
-        </svg>
+      {/* Glassmorphic LYRA LAB Logo Backdrop */}
+      <div className="absolute inset-0 flex items-center justify-center opacity-10 pointer-events-none z-0">
+        <motion.img
+          src="/og_thumbnail.png"
+          alt="LYRA LAB Logo"
+          className="w-[280px] h-[280px] sm:w-[380px] sm:h-[380px] object-contain rounded-[40px] shadow-[0_0_80px_rgba(255,255,255,0.05)] border border-white/10"
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 0.1 }}
+          transition={{ duration: 1.5, ease: 'easeOut' }}
+        />
       </div>
 
       <div className="flex-1 flex flex-col items-center justify-center px-6 pb-20 relative z-10">
