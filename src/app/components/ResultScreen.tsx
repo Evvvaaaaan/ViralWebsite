@@ -213,7 +213,7 @@ export default function ResultScreen({ result, gender, onRestart }: ResultScreen
     logGAEvent('kakao_share_clicked', 'engagement', 'Quick Actions');
     logUserEvent('kakao_share_clicked', { source: 'result_page' });
     const text = `나는 전국 상위 ${result.percentile}%! ${userType.name} 유형\n당신의 순위는?`;
-    const url = window.location.origin;
+    const url = 'https://lyralab.site/percentme';
 
     if (navigator.share) {
       try {

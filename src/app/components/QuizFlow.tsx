@@ -103,10 +103,11 @@ export default function QuizFlow() {
       });
 
       if (response.success && response.data?.rankings) {
-        const { rankings } = response.data;
+        const { rankings, id } = response.data;
         // 서버에서 받은 실제 순위로 업데이트
         calculatedResult.rankings = rankings;
         calculatedResult.percentile = rankings.national;
+        calculatedResult.id = id;
 
         // 등급 재계산 (실제 순위 기반)
         const percentile = rankings.national;

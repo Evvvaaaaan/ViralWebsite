@@ -1,5 +1,5 @@
 import { Link } from 'react-router';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useState, useEffect } from 'react';
 import { Trophy, Medal, Award, Home, BarChart3, Info, User, Users } from 'lucide-react';
 import { fetchLeaderboard } from '../utils/apiClient';
@@ -72,7 +72,42 @@ export default function LeaderboardPage() {
     };
   }, []);
 
+  const [myId, setMyId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const savedResult = localStorage.getItem('quiz-result');
+    if (savedResult) {
+      try {
+        const parsed = JSON.parse(savedResult);
+        if (parsed.result && parsed.result.id) {
+          setMyId(parsed.result.id);
+          console.log('Found user result ID:', parsed.result.id);
+        }
+      } catch (e) {
+        console.error('Failed to parse quiz-result:', e);
+      }
+    }
+  }, []);
+
   const currentData = leaderboards[activeTab];
+  const myEntry = currentData.find((entry: any) => entry.id === myId);
+
+  const scrollToMyRank = () => {
+    if (myId) {
+      const element = document.getElementById(myId);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        element.style.outline = '3px solid var(--action-blue)';
+        element.style.boxShadow = '0 0 25px rgba(0, 102, 204, 0.4)';
+        element.style.zIndex = '10';
+        setTimeout(() => {
+          element.style.outline = 'none';
+          element.style.boxShadow = 'none';
+          element.style.zIndex = 'auto';
+        }, 2000);
+      }
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#f7f7f7] flex flex-col md:flex-row">
@@ -124,7 +159,7 @@ export default function LeaderboardPage() {
                   <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
                 </span>
               </h1>
-              <p className="text-[14px] md:text-[15px] text-gray-500">실시간 데이터베이스 기반 상위 10명</p>
+              <p className="text-[14px] md:text-[15px] text-gray-500">실시간 데이터베이스 기반 전체 순위</p>
             </div>
             {isLoading && (
               <span className="text-[12px] text-gray-400 bg-gray-100 px-3 py-1 rounded-full font-medium animate-pulse">
@@ -153,85 +188,125 @@ export default function LeaderboardPage() {
           </div>
 
           {/* Leaderboard */}
-          <div className="bg-white rounded-xl md:rounded-2xl border border-gray-200 overflow-hidden">
-            {currentData.map((entry, idx) => (
-              <motion.div
-                key={idx}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: idx * 0.05 }}
-                className="flex items-center gap-2 md:gap-4 p-3 md:p-4 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0"
-              >
-                {/* Rank */}
-                <div className="w-8 md:w-12 flex-shrink-0 flex items-center justify-center">
-                  {entry.rank === 1 && (
-                    <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-gradient-to-br from-yellow-400 to-yellow-600 flex items-center justify-center">
-                      <Trophy className="w-4 h-4 md:w-5 md:h-5 text-white" />
-                    </div>
-                  )}
-                  {entry.rank === 2 && (
-                    <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-gradient-to-br from-gray-300 to-gray-500 flex items-center justify-center">
-                      <Medal className="w-4 h-4 md:w-5 md:h-5 text-white" />
-                    </div>
-                  )}
-                  {entry.rank === 3 && (
-                    <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center">
-                      <Award className="w-4 h-4 md:w-5 md:h-5 text-white" />
-                    </div>
-                  )}
-                  {entry.rank > 3 && (
-                    <div className="text-[14px] md:text-[16px] font-semibold text-gray-400">
-                      {entry.rank}
-                    </div>
-                  )}
-                </div>
+          <div className="bg-white rounded-xl md:rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
+            {currentData.map((entry: any, idx: number) => {
+              const isMe = entry.id && entry.id === myId;
+              const shouldAnimate = idx < 30;
 
-                {/* Avatar */}
-                <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center flex-shrink-0">
-                  {entry.gender === 'male' ? (
-                    <User className="w-5 h-5 md:w-6 md:h-6 text-white" />
-                  ) : (
-                    <Users className="w-5 h-5 md:w-6 md:h-6 text-white" />
-                  )}
-                </div>
+              return (
+                <motion.div
+                  key={entry.id || idx}
+                  id={entry.id || undefined}
+                  initial={shouldAnimate ? { opacity: 0, x: -20 } : undefined}
+                  animate={shouldAnimate ? { opacity: 1, x: 0 } : undefined}
+                  transition={shouldAnimate ? { delay: Math.min(idx, 15) * 0.04 } : undefined}
+                  className={`flex items-center gap-2 md:gap-4 p-3 md:p-4 transition-all duration-300 border-b border-gray-100 last:border-0 relative ${
+                    isMe ? 'bg-blue-50/70 border-l-4 border-l-blue-500 shadow-inner' : 'hover:bg-gray-50'
+                  }`}
+                  style={{
+                    scrollMargin: '100px'
+                  }}
+                >
+                  {/* Rank */}
+                  <div className="w-8 md:w-12 flex-shrink-0 flex items-center justify-center">
+                    {entry.rank === 1 && (
+                      <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-gradient-to-br from-yellow-400 to-yellow-600 flex items-center justify-center shadow-sm">
+                        <Trophy className="w-4 h-4 md:w-5 md:h-5 text-white" />
+                      </div>
+                    )}
+                    {entry.rank === 2 && (
+                      <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-gradient-to-br from-gray-300 to-gray-500 flex items-center justify-center shadow-sm">
+                        <Medal className="w-4 h-4 md:w-5 md:h-5 text-white" />
+                      </div>
+                    )}
+                    {entry.rank === 3 && (
+                      <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center shadow-sm">
+                        <Award className="w-4 h-4 md:w-5 md:h-5 text-white" />
+                      </div>
+                    )}
+                    {entry.rank > 3 && (
+                      <div className="text-[14px] md:text-[16px] font-semibold text-gray-400">
+                        {entry.rank}
+                      </div>
+                    )}
+                  </div>
 
-                {/* Name */}
-                <div className="flex-1 min-w-0">
-                  <div className="text-[14px] md:text-[15px] font-semibold text-gray-800">
-                    {entry.name}
+                  {/* Avatar */}
+                  <div className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center flex-shrink-0 bg-gradient-to-br ${
+                    isMe ? 'from-blue-500 to-blue-600' : 'from-blue-400 to-purple-500'
+                  }`}>
+                    {entry.gender === 'male' ? (
+                      <User className="w-5 h-5 md:w-6 md:h-6 text-white" />
+                    ) : (
+                      <Users className="w-5 h-5 md:w-6 md:h-6 text-white" />
+                    )}
                   </div>
-                  <div className="text-[12px] md:text-[13px] text-gray-500">
-                    {entry.gender === 'male' ? '남성' : '여성'}
-                  </div>
-                </div>
 
-                {/* Score */}
-                <div className="text-right flex-shrink-0">
-                  <div className="text-[18px] md:text-[20px] font-bold text-gray-800">
-                    {entry.score.toFixed(2)}
+                  {/* Name */}
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[14px] md:text-[15px] font-semibold text-gray-800 flex items-center flex-wrap gap-1">
+                      {isMe ? '나 (내 기록)' : entry.name}
+                      {isMe && (
+                        <span className="text-[10px] sm:text-[11px] font-bold text-white bg-blue-500 px-2.5 py-0.5 rounded-full shadow-[0_2px_5px_rgba(59,130,246,0.3)] animate-pulse">
+                          MY
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-[12px] md:text-[13px] text-gray-500">
+                      {entry.gender === 'male' ? '남성' : '여성'}
+                    </div>
                   </div>
-                  <div className="text-[11px] md:text-[12px] text-gray-500">점수</div>
-                </div>
-              </motion.div>
-            ))}
+
+                  {/* Score */}
+                  <div className="text-right flex-shrink-0">
+                    <div className={`text-[18px] md:text-[20px] font-bold ${isMe ? 'text-blue-600' : 'text-gray-800'}`}>
+                      {entry.score.toFixed(2)}
+                    </div>
+                    <div className="text-[11px] md:text-[12px] text-gray-500">점수</div>
+                  </div>
+                </motion.div>
+              );
+            })}
           </div>
 
           {/* CTA */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.6 }}
+            transition={{ delay: 0.4 }}
             className="mt-6 md:mt-8 text-center"
           >
             <Link
               to="/"
-              className="inline-block w-full md:w-auto px-6 md:px-8 py-3 md:py-4 rounded-xl bg-blue-500 text-white font-semibold text-[14px] md:text-[15px] hover:bg-blue-600 transition-colors"
+              className="inline-block w-full md:w-auto px-6 md:px-8 py-3 md:py-4 rounded-xl bg-blue-500 text-white font-semibold text-[14px] md:text-[15px] hover:bg-blue-600 transition-colors shadow-md"
             >
-              내 순위 확인하기
+              다시 테스트하기
             </Link>
           </motion.div>
         </div>
       </div>
+
+      {/* Floating Jump to My Rank Button */}
+      <AnimatePresence>
+        {myId && myEntry && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 50, scale: 0.9 }}
+            className="fixed bottom-6 right-6 md:right-8 z-40"
+          >
+            <motion.button
+              onClick={scrollToMyRank}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="flex items-center gap-2 px-5 py-3 rounded-full bg-blue-500 text-white font-bold text-[14px] shadow-[0_10px_25px_rgba(59,130,246,0.4)] border border-blue-400/20 cursor-pointer"
+            >
+              <Trophy size={16} className="animate-bounce" />
+              <span>내 순위 ({myEntry.rank}위) 바로가기</span>
+            </motion.button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

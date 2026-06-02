@@ -53,7 +53,7 @@ export default function ShareModal({ isOpen, onClose, resultScreenRef, resultDat
     if (isOpen) {
       logGAEvent('share_modal_opened', 'engagement', 'Share Modal');
       logUserEvent('share_modal_opened');
-      const url = `${window.location.origin}?challenge=true`;
+      const url = 'https://lyralab.site/percentme';
       setShareUrl(url);
       setCaptureReady(false);
       setImageBlob(null);

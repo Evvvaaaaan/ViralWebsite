@@ -102,6 +102,7 @@ export async function submitResult(data: {
 }) {
   return apiRequest<{
     success: boolean;
+    id: string;
     rankings: {
       national: number;
       region: number;
@@ -128,11 +129,13 @@ export async function fetchStats() {
  * 리더보드 조회 API
  */
 export interface LeaderboardEntry {
+  id?: string;
   rank: number;
   name: string;
   score: number;
   gender: 'male' | 'female';
 }
+
 
 export interface LeaderboardResponse {
   all: LeaderboardEntry[];
