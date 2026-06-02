@@ -1,7 +1,7 @@
 import { createBrowserRouter } from "react-router";
 import QuizFlow from "./components/QuizFlow";
 import StatsPage from "./pages/StatsPage";
-import AdminPage from "./pages/AdminPage";
+// import AdminPage from "./pages/AdminPage";
 import AboutPage from "./pages/AboutPage";
 import ResultPage from "./pages/ResultPage";
 import LeaderboardPage from "./pages/LeaderboardPage";
@@ -24,10 +24,10 @@ export const router = createBrowserRouter([
     path: "/stats",
     Component: StatsPage,
   },
-  {
-    path: "/admin",
-    Component: AdminPage,
-  },
+  // {
+  //   path: "/admin",
+  //   Component: AdminPage,
+  // },
   {
     path: "/about",
     Component: AboutPage,

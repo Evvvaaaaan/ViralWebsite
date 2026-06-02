@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { motion } from 'motion/react';
-import { MapPin, Calendar, ArrowRight, X } from 'lucide-react';
+import { MapPin, ArrowRight, X } from 'lucide-react';
+
 
 interface AdditionalInfoScreenProps {
   onComplete: (info: { region: string | null; ageGroup: string | null }) => void;
   onSkip: () => void;
+  preselectedAgeGroup?: string | null;
 }
 
 const regions = [
@@ -27,24 +29,17 @@ const regions = [
   '제주',
 ];
 
-const ageGroups = [
-  '10대',
-  '20대',
-  '30대',
-  '40대',
-  '50대 이상',
-];
 
-export default function AdditionalInfoScreen({ onComplete, onSkip }: AdditionalInfoScreenProps) {
+export default function AdditionalInfoScreen({ onComplete, onSkip, preselectedAgeGroup }: AdditionalInfoScreenProps) {
   const [region, setRegion] = useState<string | null>(null);
-  const [ageGroup, setAgeGroup] = useState<string | null>(null);
+  const [ageGroup, setAgeGroup] = useState<string | null>(preselectedAgeGroup || null);
 
   const handleSubmit = () => {
     onComplete({ region, ageGroup });
   };
 
   return (
-    <div className="size-full overflow-y-auto relative" style={{ background: '#000000' }}>
+    <div className="w-full min-h-screen overflow-y-auto relative" style={{ background: '#000000' }}>
       {/* Background effect */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute inset-0 opacity-20">
@@ -93,7 +88,7 @@ export default function AdditionalInfoScreen({ onComplete, onSkip }: AdditionalI
             더 정확한 순위를 위해
           </h1>
           <p className="text-[18px] text-white/70">
-            지역과 연령대를 입력하면 세분화된 순위를 확인할 수 있어요
+            거주 지역을 선택하면 세분화된 지역 순위를 확인할 수 있어요
             <br />
             <span className="text-[15px] text-white/50">(선택사항)</span>
           </p>
@@ -104,7 +99,7 @@ export default function AdditionalInfoScreen({ onComplete, onSkip }: AdditionalI
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="mb-8"
+          className="mb-12"
         >
           <div className="flex items-center gap-2 mb-4">
             <MapPin className="w-5 h-5 text-blue-400" strokeWidth={1.5} />
@@ -131,43 +126,12 @@ export default function AdditionalInfoScreen({ onComplete, onSkip }: AdditionalI
           </div>
         </motion.div>
 
-        {/* Age Group Selection */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="mb-12"
-        >
-          <div className="flex items-center gap-2 mb-4">
-            <Calendar className="w-5 h-5 text-purple-400" strokeWidth={1.5} />
-            <h2 className="text-[21px] font-semibold text-white">연령대</h2>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-            {ageGroups.map((age) => (
-              <motion.button
-                key={age}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => setAgeGroup(age)}
-                className="py-4 px-5 rounded-[12px] text-[16px] font-medium transition-all"
-                style={{
-                  background: ageGroup === age ? 'rgba(168, 85, 247, 0.3)' : 'rgba(255, 255, 255, 0.05)',
-                  border: ageGroup === age ? '2px solid #A855F7' : '1px solid rgba(255, 255, 255, 0.1)',
-                  color: ageGroup === age ? '#C084FC' : 'rgba(255, 255, 255, 0.7)',
-                }}
-              >
-                {age}
-              </motion.button>
-            ))}
-          </div>
-        </motion.div>
-
         {/* Submit Button */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
+          transition={{ delay: 0.3 }}
+          className="mb-8"
         >
           <motion.button
             whileHover={{ scale: 1.02 }}
@@ -175,20 +139,20 @@ export default function AdditionalInfoScreen({ onComplete, onSkip }: AdditionalI
             onClick={handleSubmit}
             className="w-full py-5 rounded-full font-bold text-[18px] flex items-center justify-center gap-3"
             style={{
-              background: region && ageGroup
+              background: region
                 ? 'linear-gradient(135deg, #3B82F6, #8B5CF6)'
                 : 'rgba(255, 255, 255, 0.1)',
               color: 'white',
-              border: region && ageGroup ? 'none' : '1px solid rgba(255, 255, 255, 0.2)',
+              border: region ? 'none' : '1px solid rgba(255, 255, 255, 0.2)',
             }}
           >
-            <span>{region && ageGroup ? '정확한 순위 확인하기' : '이대로 확인하기'}</span>
+            <span>{region ? '정확한 순위 확인하기' : '이대로 확인하기'}</span>
             <ArrowRight className="w-5 h-5" />
           </motion.button>
 
-          {!region || !ageGroup ? (
+          {!region ? (
             <p className="text-center text-[13px] text-white/50 mt-3">
-              선택하지 않아도 전국 순위는 확인할 수 있어요
+              선택하지 않아도 전국 및 연령별 순위는 확인할 수 있어요
             </p>
           ) : null}
         </motion.div>
@@ -197,8 +161,8 @@ export default function AdditionalInfoScreen({ onComplete, onSkip }: AdditionalI
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.6 }}
-          className="mt-8 p-4 rounded-[16px]"
+          transition={{ delay: 0.4 }}
+          className="p-4 rounded-[16px]"
           style={{
             background: 'rgba(59, 130, 246, 0.1)',
             border: '1px solid rgba(59, 130, 246, 0.2)',
@@ -207,9 +171,9 @@ export default function AdditionalInfoScreen({ onComplete, onSkip }: AdditionalI
           <div className="flex items-start gap-3">
             <div className="text-[18px]">💡</div>
             <div className="flex-1 text-[13px] text-white/70">
-              지역과 연령대를 선택하면 더 세분화된 순위를 확인할 수 있어요.
+              거주 지역을 선택하면 더 세분화된 지역 순위를 확인할 수 있어요.
               <br />
-              예: 전국 7% → 서울 4.8% → 20대 3.1%
+              예: 전국 7% → 서울 4.8%
             </div>
           </div>
         </motion.div>

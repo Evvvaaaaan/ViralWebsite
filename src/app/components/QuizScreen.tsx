@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import type { Gender, QuizAnswer } from '../types';
-import { questions } from '../data/questions';
+import { getQuestions } from '../data/questions';
 import { getCurrentOnlineUsers } from '../utils/engagement';
 import { Users } from 'lucide-react';
+import { logGAEvent } from '../utils/analytics';
+import { logUserEvent } from '../utils/apiClient';
 
 interface QuizScreenProps {
   gender: Gender;
+  ageGroup: string;
   onComplete: (answers: QuizAnswer[]) => void;
   initialAnswers: QuizAnswer[];
 }
@@ -19,7 +22,7 @@ const categories = [
   { name: '마인드셋', range: [21, 25] },
 ];
 
-export default function QuizScreen({ gender, onComplete, initialAnswers }: QuizScreenProps) {
+export default function QuizScreen({ gender, ageGroup, onComplete, initialAnswers }: QuizScreenProps) {
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState<QuizAnswer[]>(initialAnswers);
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
@@ -30,7 +33,11 @@ export default function QuizScreen({ gender, onComplete, initialAnswers }: QuizS
   const [showExitWarning, setShowExitWarning] = useState(false);
   const [currentOnline, setCurrentOnline] = useState(0);
 
-  const question = questions[currentQuestion];
+  const questionsList = getQuestions(ageGroup);
+  const question = questionsList[currentQuestion];
+  const options = question.genderSpecificOptions
+    ? (gender === 'male' ? question.genderSpecificOptions.male : question.genderSpecificOptions.female)
+    : question.options;
 
   // 동시 참여자 수 업데이트 (5초마다 변동)
   useEffect(() => {
@@ -71,9 +78,9 @@ export default function QuizScreen({ gender, onComplete, initialAnswers }: QuizS
   // Save session
   useEffect(() => {
     if (answers.length > 0) {
-      localStorage.setItem('quiz-session', JSON.stringify({ answers, currentQuestion, gender }));
+      localStorage.setItem('quiz-session', JSON.stringify({ answers, currentQuestion, gender, ageGroup }));
     }
-  }, [answers, currentQuestion, gender]);
+  }, [answers, currentQuestion, gender, ageGroup]);
 
   // Handle browser back button
   useEffect(() => {
@@ -117,6 +124,10 @@ export default function QuizScreen({ gender, onComplete, initialAnswers }: QuizS
 
     setSelectedOption(optionIndex);
 
+    const qNum = currentQuestion + 1;
+    logGAEvent(`question_${qNum}_answered`, 'quiz_flow', `Question ${qNum}`);
+    logUserEvent('question_answered', { questionNumber: qNum, answerIndex: optionIndex });
+
     // Social feedback after 350ms
     setTimeout(() => {
       const percentage = Math.floor(Math.random() * 40) + 30;
@@ -130,16 +141,17 @@ export default function QuizScreen({ gender, onComplete, initialAnswers }: QuizS
 
     // Auto-advance after 1000ms (Increased to give more reading time)
     setTimeout(() => {
+      const score = question.isReverse ? (optionIndex + 1) : (5 - optionIndex);
       const newAnswers = [
         ...answers.filter(a => a.questionId !== question.id),
-        { questionId: question.id, answer: 5 - optionIndex },
+        { questionId: question.id, answer: score },
       ];
       setAnswers(newAnswers);
 
       const currentSec = getCurrentSection(currentQuestion);
 
       // Check if section completed
-      if (currentQuestion < 24) {
+      if (currentQuestion < questionsList.length - 1) {
         if ((currentQuestion + 1) % 5 === 0) {
           setCompletedSection(currentSec);
           setShowSectionCard(true);
@@ -166,7 +178,7 @@ export default function QuizScreen({ gender, onComplete, initialAnswers }: QuizS
 
   return (
     <div
-      className="size-full flex flex-col overflow-hidden transition-colors duration-700"
+      className="w-full min-h-screen flex flex-col overflow-hidden transition-colors duration-700"
       style={{ background: bgColor }}
     >
       {/* Segmented Progress Bar */}
@@ -233,6 +245,8 @@ export default function QuizScreen({ gender, onComplete, initialAnswers }: QuizS
                 key={currentQuestion}
                 question={question}
                 questionNumber={currentQuestion + 1}
+                totalQuestions={questionsList.length}
+                options={options}
                 selectedOption={selectedOption}
                 socialFeedback={socialFeedback}
                 onAnswer={handleAnswer}
@@ -265,7 +279,7 @@ export default function QuizScreen({ gender, onComplete, initialAnswers }: QuizS
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.5 }}
-        className="fixed bottom-6 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full flex items-center gap-2"
+        className="fixed bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-full flex items-center gap-2"
         style={{
           background: 'rgba(0, 0, 0, 0.6)',
           border: '1px solid rgba(255, 255, 255, 0.2)',
@@ -284,6 +298,8 @@ export default function QuizScreen({ gender, onComplete, initialAnswers }: QuizS
 interface QuestionCardProps {
   question: any;
   questionNumber: number;
+  totalQuestions: number;
+  options: string[];
   selectedOption: number | null;
   socialFeedback: string | null;
   onAnswer: (index: number) => void;
@@ -296,6 +312,8 @@ interface QuestionCardProps {
 function QuestionCard({
   question,
   questionNumber,
+  totalQuestions,
+  options,
   selectedOption,
   socialFeedback,
   onAnswer,
@@ -304,44 +322,356 @@ function QuestionCard({
   textColor,
   mutedColor,
 }: QuestionCardProps) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, x: direction === 'forward' ? 40 : -40 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: direction === 'forward' ? -40 : 40 }}
-      transition={{ duration: 0.3, ease: [0.4, 0.0, 0.2, 1] }}
-    >
-      <div
-        className="mb-6"
-        style={{
-          fontSize: '14px',
-          color: mutedColor,
-          letterSpacing: '-0.224px',
-        }}
-      >
-        질문 {questionNumber} / {questions.length} · {question.category}
-      </div>
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [localSelected, setLocalSelected] = useState<number | null>(null);
 
-      <h2
-        className="mb-12"
-        style={{
-          fontSize: '40px',
-          fontWeight: 600,
-          lineHeight: 1.1,
-          color: textColor,
-        }}
-      >
-        {question.question}
-      </h2>
+  useEffect(() => {
+    setLocalSelected(selectedOption);
+  }, [selectedOption]);
 
+  const handleSliderSelect = (idx: number) => {
+    if (selectedOption !== null) return;
+    setLocalSelected(idx);
+    onAnswer(idx);
+  };
+
+  const renderContent = () => {
+    if (question.type === 'scale') {
+      if (question.scaleType === 'grid') {
+        return (
+          <div className="grid grid-cols-2 gap-3 sm:gap-4">
+            {options.map((option: string, index: number) => (
+              <motion.button
+                key={index}
+                onClick={() => onAnswer(index)}
+                disabled={selectedOption !== null}
+                whileTap={{ scale: selectedOption === null ? 0.98 : 1 }}
+                className="text-left px-4 py-4 sm:px-5 sm:py-6 transition-all duration-200 relative overflow-hidden"
+                style={{
+                  background:
+                    selectedOption === index
+                      ? 'var(--action-blue)'
+                      : isLightSection
+                      ? 'var(--canvas-parchment)'
+                      : 'rgba(255, 255, 255, 0.05)',
+                  border:
+                    selectedOption === index
+                      ? 'none'
+                      : isLightSection
+                      ? '1px solid var(--hairline)'
+                      : '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: 'var(--rounded-lg)',
+                  cursor: selectedOption === null ? 'pointer' : 'default',
+                  opacity: selectedOption !== null && selectedOption !== index ? 0.3 : 1,
+                }}
+              >
+                <div className="flex flex-col gap-3 relative z-10">
+                  <div
+                    className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0"
+                    style={{
+                      background:
+                        selectedOption === index
+                          ? 'rgba(255, 255, 255, 0.3)'
+                          : isLightSection
+                          ? 'var(--divider-soft)'
+                          : 'rgba(255, 255, 255, 0.1)',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      color: selectedOption === index ? '#ffffff' : mutedColor,
+                    }}
+                  >
+                    {selectedOption === index ? '✓' : index + 1}
+                  </div>
+                  <span
+                    style={{
+                      fontSize: '16px',
+                      fontWeight: 400,
+                      lineHeight: 1.35,
+                      letterSpacing: '-0.3px',
+                      color: selectedOption === index ? '#ffffff' : textColor,
+                    }}
+                  >
+                    {option}
+                  </span>
+                  <AnimatePresence>
+                    {selectedOption === index && socialFeedback && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="text-[12px] text-white/80 mt-1"
+                      >
+                        {socialFeedback}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </motion.button>
+            ))}
+          </div>
+        );
+      }
+
+      if (question.scaleType === 'slider') {
+        const stepPercent = 100 / (options.length - 1);
+        const activePercent = localSelected !== null ? localSelected * stepPercent : 0;
+
+        return (
+          <div className="w-full flex flex-col items-center">
+            {/* Feedback bubble / indicator */}
+            <div className="text-center mb-6 h-12 flex items-center justify-center">
+              {localSelected !== null ? (
+                <motion.div
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  className="px-5 py-2 rounded-full border border-blue-500/30 bg-blue-500/10 text-blue-400 font-medium text-[15px] sm:text-[17px] backdrop-blur-md shadow-[0_0_15px_rgba(0,102,204,0.15)]"
+                >
+                  {options[localSelected]}
+                </motion.div>
+              ) : hoveredIndex !== null ? (
+                <div className="text-[15px] text-white/50 font-normal">
+                  {options[hoveredIndex]}
+                </div>
+              ) : (
+                <div className="text-[13px] sm:text-[14px]" style={{ color: mutedColor }}>
+                  원하는 지점을 선택하세요
+                </div>
+              )}
+            </div>
+
+            {/* Slider track container */}
+            <div className="relative w-full h-8 flex items-center mb-8 cursor-pointer select-none">
+              {/* Background Track */}
+              <div
+                className="w-full h-1.5 rounded-full"
+                style={{
+                  background: isLightSection ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.1)',
+                }}
+              />
+              {/* Active/Filled Track */}
+              <motion.div
+                className="absolute top-1/2 -translate-y-1/2 left-0 h-1.5 rounded-full bg-gradient-to-r from-blue-600 to-blue-400 shadow-[0_0_10px_rgba(0,102,204,0.3)]"
+                initial={{ width: 0 }}
+                animate={{ width: `${activePercent}%` }}
+                transition={{ type: 'spring', stiffness: 120, damping: 20 }}
+              />
+              {/* Steps Nodes */}
+              {options.map((opt: string, idx: number) => {
+                const leftPos = idx * stepPercent;
+                const isStepSelected = localSelected === idx;
+
+                return (
+                  <div
+                    key={idx}
+                    className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 flex flex-col items-center"
+                    style={{ left: `${leftPos}%` }}
+                    onClick={() => handleSliderSelect(idx)}
+                    onMouseEnter={() => setHoveredIndex(idx)}
+                    onMouseLeave={() => setHoveredIndex(null)}
+                  >
+                    <motion.div
+                      className="w-5 h-5 rounded-full border-2 transition-colors duration-200 cursor-pointer"
+                      style={{
+                        background: isStepSelected
+                          ? '#ffffff'
+                          : isLightSection
+                          ? 'var(--canvas)'
+                          : 'var(--cosmic-base)',
+                        borderColor: isStepSelected
+                          ? 'var(--action-blue)'
+                          : isLightSection
+                          ? 'rgba(0, 0, 0, 0.2)'
+                          : 'rgba(255, 255, 255, 0.3)',
+                        boxShadow: isStepSelected ? '0 0 12px var(--action-blue)' : 'none',
+                      }}
+                      whileHover={{ scale: selectedOption === null ? 1.25 : 1 }}
+                      animate={{
+                        scale: isStepSelected ? [1, 1.2, 1] : 1,
+                      }}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Labels below slider */}
+            <div className="grid grid-cols-5 w-full gap-1">
+              {options.map((opt: string, idx: number) => {
+                const isStepSelected = localSelected === idx;
+                return (
+                  <button
+                    key={idx}
+                    disabled={selectedOption !== null}
+                    onClick={() => handleSliderSelect(idx)}
+                    className="text-center focus:outline-none flex flex-col items-center group cursor-pointer"
+                    style={{ opacity: selectedOption !== null && !isStepSelected ? 0.35 : 1 }}
+                  >
+                    <span
+                      className="text-[11px] sm:text-[13px] leading-snug font-normal transition-colors duration-200"
+                      style={{
+                        color: isStepSelected
+                          ? 'var(--action-blue)'
+                          : isLightSection
+                          ? 'var(--ink)'
+                          : 'rgba(255, 255, 255, 0.65)',
+                        fontWeight: isStepSelected ? 600 : 400,
+                      }}
+                    >
+                      {opt}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            {/* Social feedback below slider */}
+            <AnimatePresence>
+              {selectedOption !== null && socialFeedback && (
+                <motion.div
+                  initial={{ opacity: 0, y: -5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="text-[13px] font-normal text-center mt-6 px-4 py-1.5 rounded-full"
+                  style={{
+                    color: isLightSection ? 'var(--action-blue)' : 'var(--body-on-dark)',
+                    background: isLightSection ? 'var(--canvas-parchment)' : 'rgba(255, 255, 255, 0.05)',
+                  }}
+                >
+                  {socialFeedback}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        );
+      }
+
+      if (question.scaleType === 'list') {
+        return (
+          <div className="relative pl-8 space-y-4">
+            {/* Connecting line */}
+            <div
+              className="absolute left-[11px] top-4 bottom-4 w-0.5"
+              style={{
+                background: isLightSection ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.1)',
+              }}
+            />
+            {/* Active filling line */}
+            {selectedOption !== null && (
+              <motion.div
+                className="absolute left-[11px] top-4 w-0.5 bg-blue-500 shadow-[0_0_8px_rgba(0,102,204,0.5)]"
+                initial={{ height: 0 }}
+                animate={{
+                  height: `${(selectedOption / (options.length - 1)) * 100}%`,
+                }}
+                transition={{ duration: 0.5, ease: 'easeInOut' }}
+                style={{
+                  maxHeight: 'calc(100% - 32px)',
+                }}
+              />
+            )}
+
+            {options.map((option: string, index: number) => {
+              const isStepSelected = selectedOption === index;
+              const isFilled = selectedOption !== null && index <= selectedOption;
+
+              return (
+                <motion.div
+                  key={index}
+                  className="relative"
+                  whileTap={{ scale: selectedOption === null ? 0.98 : 1 }}
+                >
+                  {/* Timeline Node */}
+                  <div
+                    className="absolute -left-[29px] top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 z-10 transition-all duration-300"
+                    style={{
+                      background: isStepSelected
+                        ? '#ffffff'
+                        : isFilled
+                        ? 'var(--action-blue)'
+                        : isLightSection
+                        ? 'var(--canvas)'
+                        : 'var(--cosmic-base)',
+                      borderColor: isFilled || isStepSelected
+                        ? 'var(--action-blue)'
+                        : isLightSection
+                        ? 'rgba(0, 0, 0, 0.2)'
+                        : 'rgba(255, 255, 255, 0.3)',
+                      boxShadow: isStepSelected
+                        ? '0 0 10px var(--action-blue)'
+                        : 'none',
+                    }}
+                  />
+
+                  {/* Content Card */}
+                  <button
+                    onClick={() => onAnswer(index)}
+                    disabled={selectedOption !== null}
+                    className="w-full text-left px-5 py-4 transition-all duration-200 relative overflow-hidden"
+                    style={{
+                      background: isStepSelected
+                        ? 'var(--action-blue)'
+                        : isLightSection
+                        ? 'var(--canvas-parchment)'
+                        : 'rgba(255, 255, 255, 0.04)',
+                      border: isStepSelected
+                        ? 'none'
+                        : isLightSection
+                        ? '1px solid var(--hairline)'
+                        : '1px solid rgba(255, 255, 255, 0.08)',
+                      borderRadius: 'var(--rounded-lg)',
+                      cursor: selectedOption === null ? 'pointer' : 'default',
+                      opacity: selectedOption !== null && !isStepSelected ? 0.35 : 1,
+                    }}
+                  >
+                    <div className="flex items-center gap-4 relative z-10">
+                      <div
+                        className="text-[12px] font-semibold flex-shrink-0"
+                        style={{
+                          color: isStepSelected ? '#ffffff' : mutedColor,
+                        }}
+                      >
+                        단계 {index + 1}
+                      </div>
+                      <div className="flex-1">
+                        <span
+                          style={{
+                            fontSize: '16px',
+                            fontWeight: 400,
+                            color: isStepSelected ? '#ffffff' : textColor,
+                          }}
+                        >
+                          {option}
+                        </span>
+
+                        <AnimatePresence>
+                          {isStepSelected && socialFeedback && (
+                            <motion.div
+                              initial={{ opacity: 0, y: -5 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              className="text-[12px] text-white/80 mt-1"
+                            >
+                              {socialFeedback}
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    </div>
+                  </button>
+                </motion.div>
+              );
+            })}
+          </div>
+        );
+      }
+    }
+
+    // Default vertical list (for Likert type or standard)
+    return (
       <div className="space-y-3">
-        {question.options.map((option: string, index: number) => (
+        {options.map((option: string, index: number) => (
           <motion.button
             key={index}
             onClick={() => onAnswer(index)}
             disabled={selectedOption !== null}
             whileTap={{ scale: selectedOption === null ? 0.98 : 1 }}
-            className="w-full text-left px-6 py-5 transition-all duration-200 relative overflow-hidden"
+            className="w-full text-left px-4 py-3.5 sm:px-6 sm:py-5 transition-all duration-200 relative overflow-hidden"
             style={{
               background:
                 selectedOption === index
@@ -360,7 +690,6 @@ function QuestionCard({
               opacity: selectedOption !== null && selectedOption !== index ? 0.3 : 1,
             }}
           >
-            {/* Ripple effect */}
             <AnimatePresence>
               {selectedOption === index && (
                 <motion.div
@@ -403,7 +732,6 @@ function QuestionCard({
                   {option}
                 </span>
 
-                {/* Social feedback */}
                 <AnimatePresence>
                   {selectedOption === index && socialFeedback && (
                     <motion.div
@@ -424,6 +752,40 @@ function QuestionCard({
           </motion.button>
         ))}
       </div>
+    );
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: direction === 'forward' ? 40 : -40 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: direction === 'forward' ? -40 : 40 }}
+      transition={{ duration: 0.3, ease: [0.4, 0.0, 0.2, 1] }}
+    >
+      <div
+        className="mb-6"
+        style={{
+          fontSize: '14px',
+          color: mutedColor,
+          letterSpacing: '-0.224px',
+        }}
+      >
+        질문 {questionNumber} / {totalQuestions} · {question.category}
+      </div>
+
+      <h2
+        className="mb-12"
+        style={{
+          fontSize: 'clamp(24px, 5vw, 40px)',
+          fontWeight: 600,
+          lineHeight: 1.1,
+          color: textColor,
+        }}
+      >
+        {question.question}
+      </h2>
+
+      {renderContent()}
     </motion.div>
   );
 }

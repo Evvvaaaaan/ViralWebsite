@@ -55,7 +55,7 @@ export default function LoadingScreen() {
   }, []);
 
   return (
-    <div className="size-full flex flex-col items-center justify-center px-6 relative overflow-hidden">
+    <div className="w-full min-h-screen flex flex-col items-center justify-center px-6 relative overflow-hidden">
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {Array.from({ length: 30 }).map((_, i) => (
           <motion.div

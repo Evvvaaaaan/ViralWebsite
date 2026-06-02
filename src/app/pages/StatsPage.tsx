@@ -137,7 +137,7 @@ export default function StatsPage() {
                 </span>
               </div>
               <h1
-                className="font-semibold leading-tight text-[48px]"
+                className="font-semibold leading-tight text-[32px] sm:text-[48px]"
                 style={{
                   textShadow:
                     "0 0 80px rgba(99, 102, 241, 0.4)",

@@ -1,7 +1,7 @@
 import { Link } from 'react-router';
 import { motion } from 'motion/react';
 import { useState, useEffect } from 'react';
-import { projectId, publicAnonKey } from '/utils/supabase/info';
+import { fetchStats, initMockData } from '../utils/apiClient';
 
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<'overview' | 'questions' | 'settings'>('overview');
@@ -98,19 +98,11 @@ function OverviewTab() {
   }, []);
 
   const loadStats = async () => {
-    try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-2ae6dc9b/stats`,
-        {
-          headers: {
-            'Authorization': `Bearer ${publicAnonKey}`,
-          },
-        }
-      );
-      const data = await response.json();
-      setStats(data);
-    } catch (error) {
-      console.error('Failed to load stats:', error);
+    const response = await fetchStats();
+    if (response.success && response.data) {
+      setStats(response.data);
+    } else {
+      console.error('Failed to load stats:', response.error);
     }
   };
 
@@ -122,32 +114,18 @@ function OverviewTab() {
     setIsInitializing(true);
     setInitMessage('목업 데이터 생성 중...');
 
-    try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-2ae6dc9b/init-mock-data`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${publicAnonKey}`,
-          },
-        }
-      );
+    const response = await initMockData();
 
-      const data = await response.json();
-
-      if (data.success) {
-        setInitMessage(`✅ ${data.count}개의 목업 데이터가 생성되었습니다!`);
-        await loadStats();
-      } else {
-        setInitMessage('❌ 오류가 발생했습니다.');
-      }
-    } catch (error) {
-      console.error('Failed to initialize mock data:', error);
+    if (response.success && response.data?.success) {
+      setInitMessage(`✅ ${response.data.count}개의 목업 데이터가 생성되었습니다!`);
+      await loadStats();
+    } else {
+      console.error('Failed to initialize mock data:', response.error);
       setInitMessage('❌ 오류가 발생했습니다.');
-    } finally {
-      setIsInitializing(false);
-      setTimeout(() => setInitMessage(''), 5000);
     }
+
+    setIsInitializing(false);
+    setTimeout(() => setInitMessage(''), 5000);
   };
 
   return (

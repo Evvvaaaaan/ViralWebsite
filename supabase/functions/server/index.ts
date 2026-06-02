@@ -1,7 +1,7 @@
 import { Hono } from "npm:hono";
 import { cors } from "npm:hono/cors";
 import { logger } from "npm:hono/logger";
-import * as kv from "./kv_store.tsx";
+import * as kv from "./kv_store.ts";
 const app = new Hono();
 
 // Enable logger
@@ -24,22 +24,19 @@ app.get("/make-server-2ae6dc9b/health", (c) => {
   return c.json({ status: "ok" });
 });
 
-// 목업 데이터 생성 (낮은 점수 위주)
+// 목업 카테고리 점수 생성 (실제 유저와 동일한 5~25점 범위)
+// 평균이 약 12~14점이 되도록 실제 문항 응답 가중치를 부여한 종형 분포 적용
 function generateMockScore(): number {
-  const rand = Math.random();
-  if (rand < 0.4) {
-    // 40% - 40~50점 범위
-    return Math.floor(Math.random() * 11) + 40;
-  } else if (rand < 0.7) {
-    // 30% - 50~60점 범위
-    return Math.floor(Math.random() * 11) + 50;
-  } else if (rand < 0.9) {
-    // 20% - 60~70점 범위
-    return Math.floor(Math.random() * 11) + 60;
-  } else {
-    // 10% - 70~100점 범위
-    return Math.floor(Math.random() * 31) + 70;
+  let score = 0;
+  for (let i = 0; i < 5; i++) {
+    const rand = Math.random();
+    if (rand < 0.20) score += 1;
+    else if (rand < 0.50) score += 2;
+    else if (rand < 0.80) score += 3;
+    else if (rand < 0.95) score += 4;
+    else score += 5;
   }
+  return score;
 }
 
 function generateMockCategories() {
@@ -177,6 +174,34 @@ app.get("/make-server-2ae6dc9b/stats", async (c) => {
     });
   } catch (error) {
     console.error('Error fetching stats:', error);
+    return c.json({ error: String(error) }, 500);
+  }
+});
+
+// 사용자 행동 분석 이벤트 로깅
+app.post("/make-server-2ae6dc9b/events", async (c) => {
+  try {
+    const body = await c.req.json();
+    const { eventType, metadata } = body;
+
+    if (!eventType) {
+      return c.json({ error: 'Missing required field: eventType' }, 400);
+    }
+
+    const id = `event-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const eventData = {
+      id,
+      eventType,
+      metadata: metadata || {},
+      timestamp: Date.now(),
+    };
+
+    await kv.set(`event:${id}`, eventData);
+
+    console.log(`Log event saved: ${eventType}`, eventData);
+    return c.json({ success: true, id });
+  } catch (error) {
+    console.error('Error logging event:', error);
     return c.json({ error: String(error) }, 500);
   }
 });

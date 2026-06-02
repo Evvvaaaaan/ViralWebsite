@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import LandingScreen from './LandingScreen';
 import GenderScreen from './GenderScreen';
+import AgeScreen from './AgeScreen';
 import QuizScreen from './QuizScreen';
 import LoadingScreen from './LoadingScreen';
 import AdditionalInfoScreen from './AdditionalInfoScreen';
@@ -9,12 +10,13 @@ import ChallengeModal from './ChallengeModal';
 import SessionRecoveryBanner from './SessionRecoveryBanner';
 import { AnimatePresence } from 'motion/react';
 import type { Gender, QuizAnswer, Screen } from '../types';
-import { projectId, publicAnonKey } from '/utils/supabase/info';
+import { submitResult } from '../utils/apiClient';
 
 export default function QuizFlow() {
   const navigate = useNavigate();
   const [currentScreen, setCurrentScreen] = useState<Screen>('landing');
   const [gender, setGender] = useState<Gender>(null);
+  const [ageGroup, setAgeGroup] = useState<string | null>(null);
   const [answers, setAnswers] = useState<QuizAnswer[]>([]);
   const [isChallengeMode, setIsChallengeMode] = useState(false);
   const [savedSession, setSavedSession] = useState<any>(null);
@@ -46,6 +48,7 @@ export default function QuizFlow() {
   const handleResumeSession = () => {
     if (savedSession) {
       setGender(savedSession.gender);
+      setAgeGroup(savedSession.ageGroup || '25~29세');
       setAnswers(savedSession.answers);
       setCurrentScreen('quiz');
       setShowRecoveryBanner(false);
@@ -64,6 +67,13 @@ export default function QuizFlow() {
   const handleGenderSelect = (selectedGender: Gender) => {
     setGender(selectedGender);
     setTimeout(() => {
+      setCurrentScreen('age');
+    }, 400);
+  };
+
+  const handleAgeSelect = (selectedAge: string) => {
+    setAgeGroup(selectedAge);
+    setTimeout(() => {
       setCurrentScreen('quiz');
     }, 400);
   };
@@ -80,37 +90,26 @@ export default function QuizFlow() {
 
   const handleAdditionalInfoComplete = async (info: { region: string | null; ageGroup: string | null }) => {
     // Calculate result
-    const calculatedResult = calculateResult(answers, gender);
+    const calculatedResult = calculateResult(answers, gender, info.ageGroup || ageGroup);
 
     try {
-      // 서버로 결과 전송
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-2ae6dc9b/results`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${publicAnonKey}`,
-          },
-          body: JSON.stringify({
-            gender,
-            total: calculatedResult.total,
-            categories: calculatedResult.categories,
-            region: info.region,
-            ageGroup: info.ageGroup,
-          }),
-        }
-      );
+      // 서버로 결과 전송 (apiClient: 타임아웃 10초, 재시도 3회)
+      const response = await submitResult({
+        gender,
+        total: calculatedResult.total,
+        categories: calculatedResult.categories,
+        region: info.region,
+        ageGroup: info.ageGroup || ageGroup,
+      });
 
-      const data = await response.json();
-
-      if (data.success && data.rankings) {
+      if (response.success && response.data?.rankings) {
+        const { rankings } = response.data;
         // 서버에서 받은 실제 순위로 업데이트
-        calculatedResult.rankings = data.rankings;
-        calculatedResult.percentile = data.rankings.national;
+        calculatedResult.rankings = rankings;
+        calculatedResult.percentile = rankings.national;
 
         // 등급 재계산 (실제 순위 기반)
-        const percentile = data.rankings.national;
+        const percentile = rankings.national;
         if (percentile <= 1) calculatedResult.grade = 'S';
         else if (percentile <= 5) calculatedResult.grade = 'A';
         else if (percentile <= 15) calculatedResult.grade = 'B';
@@ -143,24 +142,27 @@ export default function QuizFlow() {
   const handleRestart = () => {
     setCurrentScreen('landing');
     setGender(null);
+    setAgeGroup(null);
     setAnswers([]);
     localStorage.removeItem('quiz-session');
     localStorage.removeItem('quiz-result');
   };
 
   return (
-    <div className="size-full overflow-hidden" style={{
+    <div className="w-full min-h-screen overflow-x-hidden" style={{
       background: currentScreen === 'landing' ? '#000000' :
-                 currentScreen === 'gender' ? 'var(--cosmic-deep)' :
+                 currentScreen === 'gender' || currentScreen === 'age' ? 'var(--cosmic-deep)' :
                  currentScreen === 'loading' ? 'linear-gradient(180deg, #000000 0%, var(--cosmic-deep) 100%)' :
                  currentScreen === 'additional-info' ? '#000000' :
                  'transparent'
     }}>
       {currentScreen === 'landing' && <LandingScreen onStart={handleStart} />}
       {currentScreen === 'gender' && <GenderScreen onSelect={handleGenderSelect} />}
+      {currentScreen === 'age' && <AgeScreen onSelect={handleAgeSelect} />}
       {currentScreen === 'quiz' && (
         <QuizScreen
           gender={gender!}
+          ageGroup={ageGroup || '25~29세'}
           onComplete={handleQuizComplete}
           initialAnswers={answers}
         />
@@ -170,6 +172,7 @@ export default function QuizFlow() {
         <AdditionalInfoScreen
           onComplete={handleAdditionalInfoComplete}
           onSkip={handleSkipAdditionalInfo}
+          preselectedAgeGroup={ageGroup}
         />
       )}
 
@@ -195,7 +198,17 @@ export default function QuizFlow() {
   );
 }
 
-function calculateResult(answers: QuizAnswer[], gender: Gender) {
+function normalCDF(x: number, mean: number, stdDev: number): number {
+  const z = (x - mean) / stdDev;
+  const t = 1 / (1 + 0.2316419 * Math.abs(z));
+  const d = 0.3989423 * Math.exp(-z * z / 2);
+  const p = d * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274))));
+  let cdf = 1 - p;
+  if (z < 0) cdf = p;
+  return cdf;
+}
+
+function calculateResult(answers: QuizAnswer[], gender: Gender, ageGroup: string | null) {
   // Calculate scores by category
   const categories = {
     selfCare: answers.slice(0, 5).reduce((sum, a) => sum + a.answer, 0),
@@ -206,13 +219,34 @@ function calculateResult(answers: QuizAnswer[], gender: Gender) {
   };
 
   const total = Object.values(categories).reduce((sum, score) => sum + score, 0);
-  const maxScore = 125; // 25 questions × 5 points max
-  const percentage = (total / maxScore) * 100;
 
-  // Calculate percentile (inverse - higher score = lower percentile)
-  const percentile = Math.max(1, Math.min(99, Math.round(100 - percentage * 0.9)));
+  // 연령대별 정규분포 통계 파라미터 적용 (μ, σ)
+  let mean = 66;
+  let stdDev = 16;
 
-  // Determine grade
+  const age = ageGroup || '25~29세';
+  if (age === '10대') {
+    mean = 52;
+    stdDev = 13;
+  } else if (age === '20~24세') {
+    mean = 60;
+    stdDev = 15;
+  } else if (age === '25~29세') {
+    mean = 66;
+    stdDev = 16;
+  } else if (age === '30~39세') {
+    mean = 72;
+    stdDev = 17;
+  } else if (age === '40세 이상') {
+    mean = 75;
+    stdDev = 16;
+  }
+
+  // 누적 정규 분포 CDF 기반 통계학적 상위 백분위 계산
+  const cdfVal = normalCDF(total, mean, stdDev);
+  const percentile = Math.max(0.1, Math.min(99.9, parseFloat(((1 - cdfVal) * 100).toFixed(1))));
+
+  // Determine grade based on percentile
   let grade: 'S' | 'A' | 'B' | 'C' | 'D' | 'F';
   if (percentile <= 1) grade = 'S';
   else if (percentile <= 5) grade = 'A';
@@ -227,5 +261,6 @@ function calculateResult(answers: QuizAnswer[], gender: Gender) {
     total,
     categories,
     gender,
+    ageGroup: age,
   };
 }

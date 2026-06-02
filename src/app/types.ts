@@ -5,4 +5,4 @@ export interface QuizAnswer {
   answer: number;
 }
 
-export type Screen = 'landing' | 'gender' | 'quiz' | 'loading' | 'additional-info' | 'result';
+export type Screen = 'landing' | 'gender' | 'age' | 'quiz' | 'loading' | 'additional-info' | 'result';

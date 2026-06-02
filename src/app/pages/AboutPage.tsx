@@ -52,14 +52,14 @@ export default function AboutPage() {
           animate={{ opacity: 1, y: 0 }}
           className="text-center mb-20"
         >
-          <h1 className="text-[64px] font-semibold mb-6 leading-tight" style={{
+          <h1 className="text-[32px] sm:text-[48px] md:text-[64px] font-semibold mb-6 leading-tight" style={{
             textShadow: '0 0 80px rgba(99, 102, 241, 0.4)'
           }}>
             당신의 진짜 점수를
             <br />
             발견하세요
           </h1>
-          <p className="text-[21px] text-white/70 mb-8">
+          <p className="text-[17px] sm:text-[21px] text-white/70 mb-8">
             25개의 문항으로 확인하는
             <br />
             대한민국 실시간 순위 테스트
@@ -82,7 +82,7 @@ export default function AboutPage() {
           transition={{ delay: 0.2 }}
           className="mb-20"
         >
-          <h2 className="text-[40px] font-semibold text-center mb-12">
+          <h2 className="text-[28px] sm:text-[40px] font-semibold text-center mb-12">
             왜 이 테스트를 해야 할까요?
           </h2>
 
@@ -115,7 +115,7 @@ export default function AboutPage() {
           transition={{ delay: 0.6 }}
           className="mb-20"
         >
-          <h2 className="text-[40px] font-semibold text-center mb-12">
+          <h2 className="text-[28px] sm:text-[40px] font-semibold text-center mb-12">
             5가지 카테고리
           </h2>
 
@@ -170,7 +170,7 @@ export default function AboutPage() {
           transition={{ delay: 1.2 }}
           className="mb-20"
         >
-          <h2 className="text-[40px] font-semibold text-center mb-12">
+          <h2 className="text-[28px] sm:text-[40px] font-semibold text-center mb-12">
             어떻게 진행되나요?
           </h2>
 
@@ -194,10 +194,10 @@ export default function AboutPage() {
             backdropFilter: 'blur(20px)',
           }}
         >
-          <h2 className="text-[48px] font-semibold mb-4">
+          <h2 className="text-[28px] sm:text-[48px] font-semibold mb-4">
             지금 바로 시작하세요
           </h2>
-          <p className="text-[21px] text-white/80 mb-8">
+          <p className="text-[17px] sm:text-[21px] text-white/80 mb-8">
             3분이면 당신의 전국 순위를 확인할 수 있습니다
           </p>
           <Link

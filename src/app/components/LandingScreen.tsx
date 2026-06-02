@@ -3,6 +3,8 @@ import { motion } from 'motion/react';
 import { Link } from 'react-router';
 import { getTotalParticipants, incrementParticipants, getCurrentOnlineUsers } from '../utils/engagement';
 import EngagementToast from './EngagementToast';
+import { logGAEvent } from '../utils/analytics';
+import { logUserEvent } from '../utils/apiClient';
 
 interface LandingScreenProps {
   onStart: () => void;
@@ -10,6 +12,12 @@ interface LandingScreenProps {
 
 export default function LandingScreen({ onStart }: LandingScreenProps) {
   const [liveCount, setLiveCount] = useState(0);
+
+  const handleStart = () => {
+    logGAEvent('quiz_start_clicked', 'engagement', 'Landing Screen');
+    logUserEvent('quiz_start_clicked', { source: 'landing_button' });
+    onStart();
+  };
   const [participants, setParticipants] = useState(0);
   const [displayParticipants, setDisplayParticipants] = useState(0);
 
@@ -68,12 +76,12 @@ export default function LandingScreen({ onStart }: LandingScreenProps) {
   const recentResults = generateRecentResults();
 
   return (
-    <div className="size-full relative overflow-hidden flex flex-col">
+    <div className="w-full min-h-screen relative overflow-hidden flex flex-col">
       {/* Navigation */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="absolute top-6 right-6 z-20 flex gap-4 text-[13px]"
+        className="absolute top-4 right-4 sm:top-6 sm:right-6 z-20 flex gap-4 text-[13px]"
       >
         <Link to="/leaderboard" className="text-white/65 hover:text-white transition-colors">
           리더보드
@@ -146,7 +154,7 @@ export default function LandingScreen({ onStart }: LandingScreenProps) {
           className="text-center mb-6"
         >
           <h1
-            className="text-[48px] font-semibold leading-[1.07] mb-4"
+            className="text-[32px] sm:text-[40px] md:text-[48px] font-semibold leading-[1.07] mb-4"
             style={{
               letterSpacing: '-0.025em',
               textShadow: '0 0 80px rgba(99, 102, 241, 0.4)'
@@ -157,7 +165,7 @@ export default function LandingScreen({ onStart }: LandingScreenProps) {
             <span className="text-white">몇 번째인가</span>
             <span style={{ color: 'var(--action-blue)' }}>?</span>
           </h1>
-          <p className="text-[17px] text-white/65 leading-[1.6] tracking-[-0.01em]">
+          <p className="text-[15px] sm:text-[17px] text-white/65 leading-[1.6] tracking-[-0.01em]">
             25개의 문항으로 확인하는
             <br />
             대한민국 실시간 순위 테스트
@@ -187,7 +195,7 @@ export default function LandingScreen({ onStart }: LandingScreenProps) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.6 }}
-          className="flex items-center gap-6 mb-12 text-[15px]"
+          className="flex items-center gap-4 sm:gap-6 mb-8 sm:mb-12 text-[14px] sm:text-[15px]"
         >
           <div className="text-center">
             <div className="text-white font-medium">{displayParticipants.toLocaleString()}</div>
@@ -212,8 +220,8 @@ export default function LandingScreen({ onStart }: LandingScreenProps) {
           className="flex flex-col items-center"
         >
           <motion.button
-            onClick={onStart}
-            className="px-12 py-4 rounded-full bg-white text-black font-bold text-[17px] tracking-[-0.01em] shadow-xl max-w-[360px] w-full"
+            onClick={handleStart}
+            className="px-8 sm:px-12 py-3.5 sm:py-4 rounded-full bg-white text-black font-bold text-[17px] tracking-[-0.01em] shadow-xl max-w-[360px] w-full"
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.96 }}
             animate={{ scale: [1, 1.015, 1] }}

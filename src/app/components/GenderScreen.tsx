@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User, UserCircle } from 'lucide-react';
-import type { Gender } from '../App';
+import type { Gender } from '../types';
+import { logGAEvent } from '../utils/analytics';
+import { logUserEvent } from '../utils/apiClient';
 
 interface GenderScreenProps {
   onSelect: (gender: Gender) => void;
@@ -13,6 +15,8 @@ export default function GenderScreen({ onSelect }: GenderScreenProps) {
 
   const handleSelect = (gender: Gender) => {
     setSelected(gender);
+    logGAEvent('gender_selected', 'engagement', gender || 'unknown');
+    logUserEvent('gender_selected', { gender });
     setTimeout(() => {
       onSelect(gender);
     }, 400);
@@ -25,7 +29,7 @@ export default function GenderScreen({ onSelect }: GenderScreenProps) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="size-full flex relative overflow-hidden"
+      className="w-full min-h-screen flex flex-col sm:flex-row relative overflow-hidden"
       style={{
         background: activeGender === 'male'
           ? 'rgba(99, 102, 241, 0.08)'
@@ -36,7 +40,7 @@ export default function GenderScreen({ onSelect }: GenderScreenProps) {
       }}
     >
       <motion.div
-        className="flex-1 flex flex-col items-center justify-center cursor-pointer relative border-r"
+        className="flex-1 flex flex-col items-center justify-center cursor-pointer relative border-b sm:border-b-0 sm:border-r"
         style={{
           borderColor: 'rgba(255, 255, 255, 0.08)',
           opacity: selected && selected !== 'male' ? 0.4 : 1,
@@ -64,11 +68,11 @@ export default function GenderScreen({ onSelect }: GenderScreenProps) {
           animate={{ scale: selected === 'male' ? 1.05 : 1 }}
           transition={{ duration: 0.3 }}
         >
-          <User className="w-16 h-16 mb-6 text-white" strokeWidth={1.5} />
-          <h2 className="text-[24px] font-semibold text-white mb-2 tracking-[-0.015em]">
+          <User className="w-12 h-12 sm:w-16 sm:h-16 mb-4 sm:mb-6 text-white" strokeWidth={1.5} />
+          <h2 className="text-[20px] sm:text-[24px] font-semibold text-white mb-2 tracking-[-0.015em]">
             남자
           </h2>
-          <p className="text-[17px] text-white/65 mb-8">
+          <p className="text-[15px] sm:text-[17px] text-white/65 mb-4 sm:mb-8">
             남성 기준 질문 · 남성 통계
           </p>
 
@@ -119,11 +123,11 @@ export default function GenderScreen({ onSelect }: GenderScreenProps) {
           animate={{ scale: selected === 'female' ? 1.05 : 1 }}
           transition={{ duration: 0.3 }}
         >
-          <UserCircle className="w-16 h-16 mb-6 text-white" strokeWidth={1.5} />
-          <h2 className="text-[24px] font-semibold text-white mb-2 tracking-[-0.015em]">
+          <UserCircle className="w-12 h-12 sm:w-16 sm:h-16 mb-4 sm:mb-6 text-white" strokeWidth={1.5} />
+          <h2 className="text-[20px] sm:text-[24px] font-semibold text-white mb-2 tracking-[-0.015em]">
             여자
           </h2>
-          <p className="text-[17px] text-white/65 mb-8">
+          <p className="text-[15px] sm:text-[17px] text-white/65 mb-4 sm:mb-8">
             여성 기준 질문 · 여성 통계
           </p>
 

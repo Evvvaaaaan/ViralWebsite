@@ -33,7 +33,7 @@ export default function ResultPage() {
 
   if (!result || !gender) {
     return (
-      <div className="size-full flex items-center justify-center bg-black text-white">
+      <div className="w-full min-h-screen flex items-center justify-center bg-black text-white">
         <div className="text-center">
           <div className="text-[21px] mb-4">결과를 불러오는 중...</div>
         </div>

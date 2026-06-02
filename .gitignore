@@ -5,3 +5,6 @@ dist/
 __figma__entrypoint__.ts
 *.log
 .DS_Store
+supabase/.temp/
+.vercel/
+

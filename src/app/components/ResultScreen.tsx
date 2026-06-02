@@ -1,11 +1,13 @@
 import { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer } from 'recharts';
-import { Crown, Diamond, Star, Sparkles, BarChart3, Sprout, Gem, Target, TrendingUp, Share2, MessageCircle, User, UserCircle, Dumbbell, Wallet, Users, Compass, Brain, MapPin, CalendarDays } from 'lucide-react';
+import { Crown, Diamond, Star, Sparkles, BarChart3, Sprout, Gem, Target, TrendingUp, Share2, MessageCircle, User, UserCircle, Dumbbell, Wallet, Users, Compass, Brain, MapPin, CalendarDays, Download, Loader2, X } from 'lucide-react';
 import type { Gender } from '../types';
 import confetti from 'canvas-confetti';
 import ShareModal from './ShareModal';
 import { Link } from 'react-router';
+import { logGAEvent } from '../utils/analytics';
+import { logUserEvent } from '../utils/apiClient';
 
 // 카테고리별 유형명 매핑
 const categoryTypes: Record<string, { adjective: string; noun: string }> = {
@@ -87,6 +89,14 @@ const gradeConfig = {
   },
 };
 
+const InstagramIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
+    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
+    <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
+  </svg>
+);
+
 export default function ResultScreen({ result, gender, onRestart }: ResultScreenProps) {
   const [displayPercentile, setDisplayPercentile] = useState(0);
   const [showParticles, setShowParticles] = useState(true);
@@ -94,7 +104,19 @@ export default function ResultScreen({ result, gender, onRestart }: ResultScreen
   const [showRankChange, setShowRankChange] = useState(false);
   const [newPercentile, setNewPercentile] = useState(result.percentile);
   const resultScreenRef = useRef<HTMLDivElement>(null);
+  const captureRef = useRef<HTMLDivElement>(null);
+  const [isCapturing, setIsCapturing] = useState(false);
+  const [mobileSaveImage, setMobileSaveImage] = useState<string | null>(null);
+  const [mobileSaveContext, setMobileSaveContext] = useState<'instagram' | 'save' | null>(null);
   const grade = gradeConfig[result.grade as keyof typeof gradeConfig];
+
+  const closeMobileSaveModal = () => {
+    if (mobileSaveImage) {
+      URL.revokeObjectURL(mobileSaveImage);
+      setMobileSaveImage(null);
+      setMobileSaveContext(null);
+    }
+  };
   const isTopRank = result.grade === 'S';
 
   // 유형명 생성
@@ -106,6 +128,12 @@ export default function ResultScreen({ result, gender, onRestart }: ResultScreen
     region: Math.max(0.1, result.percentile * 0.7),
     ageGroup: Math.max(0.1, result.percentile * 0.45),
   };
+
+  // 결과 화면 마운트 시 행동 분석 로깅
+  useEffect(() => {
+    logGAEvent('result_viewed', 'conversion', `Percentile: ${result.percentile} (${result.grade})`);
+    logUserEvent('result_viewed', { percentile: result.percentile, grade: result.grade, gender });
+  }, [result.percentile, result.grade, gender]);
 
   // 순위 변동 알림 (30-90초 후)
   useEffect(() => {
@@ -132,11 +160,140 @@ export default function ResultScreen({ result, gender, onRestart }: ResultScreen
     setShareModalOpen(true);
   };
 
-  const handleKakaoShare = () => {
-    // Quick share without modal
-    const shareUrl = `${window.location.origin}?challenge=true`;
-    const kakaoUrl = `https://story.kakao.com/share?url=${encodeURIComponent(shareUrl)}`;
-    window.open(kakaoUrl, '_blank', 'width=600,height=600');
+  /** 빠른 인스타그램 스토리 공유 (결과 화면에서 바로) */
+  const handleInstagramShare = async () => {
+    logGAEvent('insta_share_clicked', 'engagement', 'Quick Actions');
+    logUserEvent('insta_share_clicked', { source: 'result_page' });
+    if (!captureRef.current) return;
+    try {
+      setIsCapturing(true);
+      const html2canvas = (await import('html2canvas')).default;
+      const canvas = await html2canvas(captureRef.current, {
+        backgroundColor: '#000000',
+        scale: 2,
+        logging: false,
+        useCORS: true,
+        allowTaint: true,
+        height: captureRef.current.scrollHeight,
+        y: 0,
+      });
+      setIsCapturing(false);
+
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png', 1.0));
+      if (blob) {
+        const file = new File([blob], 'quiz-result.png', { type: 'image/png' });
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+        if (isMobile && navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({
+              files: [file],
+              title: '전국 순위 테스트 결과',
+            });
+            return;
+          } catch (shareErr) {
+            if ((shareErr as Error).name === 'AbortError') return; // User cancelled
+            console.warn('Instagram share failed, fallback to modal:', shareErr);
+          }
+        }
+
+        // Fallback to long-press modal with Instagram context
+        const url = URL.createObjectURL(blob);
+        setMobileSaveImage(url);
+        setMobileSaveContext('instagram');
+      }
+    } catch (err) {
+      setIsCapturing(false);
+      console.error('Instagram share failed:', err);
+    }
+  };
+
+  /** 빠른 카카오톡 공유 */
+  const handleKakaoShare = async () => {
+    logGAEvent('kakao_share_clicked', 'engagement', 'Quick Actions');
+    logUserEvent('kakao_share_clicked', { source: 'result_page' });
+    const text = `나는 전국 상위 ${result.percentile}%! ${userType.name} 유형\n당신의 순위는?`;
+    const url = window.location.origin;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: '전국 순위 테스트 결과', text, url });
+        return;
+      } catch (err) {
+        if ((err as Error).name === 'AbortError') return;
+      }
+    }
+
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    if (isMobile) {
+      window.location.href = `kakaotalk://send?msg=${encodeURIComponent(`${text}\n${url}`)}`;
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(`${text}\n${url}`);
+      alert('링크가 복사되었습니다! 카카오톡에 붙여넣기하세요.');
+    } catch (_) {}
+  };
+
+  /** 빠른 이미지 저장 (결과 화면에서 바로) */
+  const handleQuickDownload = async () => {
+    logGAEvent('image_save_clicked', 'engagement', 'Quick Actions');
+    logUserEvent('image_save_clicked', { source: 'result_page' });
+    if (!captureRef.current) return;
+    try {
+      setIsCapturing(true);
+      const html2canvas = (await import('html2canvas')).default;
+      const canvas = await html2canvas(captureRef.current, {
+        backgroundColor: '#000000',
+        scale: 2,
+        logging: false,
+        useCORS: true,
+        allowTaint: true,
+        height: captureRef.current.scrollHeight,
+        y: 0,
+      });
+      setIsCapturing(false);
+
+      canvas.toBlob(async (blob) => {
+        if (!blob) return;
+
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+        if (isMobile) {
+          try {
+            const file = new File([blob], `rank-result-${Date.now()}.png`, { type: 'image/png' });
+            if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+              await navigator.share({
+                files: [file],
+                title: '전국 순위 테스트 결과 저장',
+              });
+              return;
+            }
+          } catch (shareErr) {
+            if ((shareErr as Error).name === 'AbortError') return; // User cancelled
+            console.warn('Native share failed, fallback to modal:', shareErr);
+          }
+
+          // Fallback to long-press modal
+          const url = URL.createObjectURL(blob);
+          setMobileSaveImage(url);
+        } else {
+          // Desktop download
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.download = `순위테스트-결과-상위${result.percentile}%-${Date.now()}.png`;
+          link.href = url;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+        }
+      }, 'image/png', 1.0);
+    } catch (err) {
+      setIsCapturing(false);
+      console.error('Download failed:', err);
+    }
   };
 
   // Gold particle explosion for S grade
@@ -219,7 +376,7 @@ export default function ResultScreen({ result, gender, onRestart }: ResultScreen
   );
 
   return (
-    <div className="size-full overflow-y-auto relative">
+    <div className="w-full min-h-screen overflow-y-auto relative">
       {/* Animated background for S grade */}
       {isTopRank && (
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
@@ -241,7 +398,7 @@ export default function ResultScreen({ result, gender, onRestart }: ResultScreen
         </div>
       )}
 
-      <div ref={resultScreenRef} className="max-w-2xl mx-auto px-6 py-6 relative z-10 min-h-screen flex flex-col justify-center" style={{ background: '#000000' }}>
+      <div ref={captureRef} className="max-w-2xl mx-auto px-6 py-6 relative z-10 min-h-screen flex flex-col justify-center" style={{ background: '#000000' }}>
         {/* Compact Hero Section */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -253,7 +410,7 @@ export default function ResultScreen({ result, gender, onRestart }: ResultScreen
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.3 }}
-            className="text-[56px] font-bold mb-2 tracking-[-0.03em]"
+            className="text-[40px] sm:text-[56px] font-bold mb-2 tracking-[-0.03em]"
             style={{
               color: grade.color,
               textShadow: `0 0 40px ${grade.glow}`,
@@ -277,7 +434,7 @@ export default function ResultScreen({ result, gender, onRestart }: ResultScreen
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.5 }}
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-full text-[19px] font-bold mb-3"
+            className="inline-flex items-center gap-2 px-4 sm:px-6 py-2 sm:py-3 rounded-full text-[16px] sm:text-[19px] font-bold mb-3"
             style={{
               background: isTopRank
                 ? `linear-gradient(135deg, ${grade.color}30, ${grade.color}50)`
@@ -317,7 +474,7 @@ export default function ResultScreen({ result, gender, onRestart }: ResultScreen
           <div className="text-[13px] text-white/45 uppercase tracking-wider mb-3 text-center">
             100명 중 당신의 위치
           </div>
-          <div className="grid grid-cols-10 gap-1.5 max-w-md mx-auto">
+          <div className="grid grid-cols-10 gap-1 sm:gap-1.5 max-w-md mx-auto">
             {Array.from({ length: 100 }).map((_, i) => {
               // percentile이 8이면 상위 8%이므로 100명 중 8번째
               // 배열 인덱스는 0부터 시작하므로 인덱스 7
@@ -427,7 +584,7 @@ export default function ResultScreen({ result, gender, onRestart }: ResultScreen
           </div>
 
           <div className="flex justify-center">
-            <RadarChart data={radarData} width={320} height={320} margin={{ top: 5, right: 35, bottom: 5, left: 35 }}>
+            <RadarChart data={radarData} width={280} height={280} margin={{ top: 5, right: 30, bottom: 5, left: 30 }}>
               <PolarGrid stroke="rgba(255, 255, 255, 0.1)" />
               <PolarAngleAxis
                 dataKey="category"
@@ -506,30 +663,88 @@ export default function ResultScreen({ result, gender, onRestart }: ResultScreen
           </div>
         </motion.div>
 
-        {/* Share Buttons - Compact */}
+        {/* Share Buttons - Quick Actions */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.95 }}
-          className="space-y-2"
+          className="space-y-3"
         >
+          {/* 빠른 공유 버튼 그리드 */}
+          <div className="grid grid-cols-2 gap-2">
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              onClick={handleKakaoShare}
+              disabled={isCapturing}
+              className="py-3.5 rounded-2xl font-semibold text-[15px] flex items-center justify-center gap-2 transition-all duration-300"
+              style={{
+                background: '#FEE500',
+                color: '#3A1D1D',
+              }}
+            >
+              <MessageCircle className="w-4 h-4" />
+              <span>카카오톡</span>
+            </motion.button>
+
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              onClick={handleInstagramShare}
+              disabled={isCapturing}
+              className="py-3.5 rounded-2xl font-semibold text-[15px] flex items-center justify-center gap-2 transition-all duration-300"
+              style={{
+                background: 'linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)',
+                color: 'white',
+                boxShadow: '0 4px 15px rgba(220, 39, 67, 0.3)',
+              }}
+            >
+              {isCapturing ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <InstagramIcon className="w-4 h-4" />
+              )}
+              <span>인스타 스토리</span>
+            </motion.button>
+          </div>
+
+          {/* 이미지 저장 */}
           <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={handleShare}
-            className="w-full py-3 rounded-full font-semibold text-[15px] flex items-center justify-center gap-2"
+            whileTap={{ scale: 0.97 }}
+            onClick={handleQuickDownload}
+            disabled={isCapturing}
+            className="w-full py-3.5 rounded-2xl font-semibold text-[15px] flex items-center justify-center gap-2"
             style={{
-              background: grade.color,
+              background: 'rgba(255, 255, 255, 0.08)',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
               color: 'white',
             }}
           >
-            <Share2 className="w-4 h-4" strokeWidth={2} />
-            <span>결과 공유하기</span>
+            {isCapturing ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Download className="w-4 h-4" strokeWidth={2} />
+            )}
+            <span>결과 이미지 저장</span>
           </motion.button>
 
+          {/* 더 많은 공유 옵션 */}
           <button
-            onClick={onRestart}
+            onClick={() => {
+              logGAEvent('more_shares_clicked', 'engagement', 'Quick Actions');
+              logUserEvent('more_shares_clicked', { source: 'result_page' });
+              handleShare();
+            }}
             className="w-full py-2 text-[13px] text-white/65 hover:text-white transition-colors"
+          >
+            더 많은 공유 옵션 →
+          </button>
+
+          <button
+            onClick={() => {
+              logGAEvent('restart_clicked', 'engagement', 'Quick Actions');
+              logUserEvent('restart_clicked', { source: 'result_page' });
+              onRestart();
+            }}
+            className="w-full py-2 text-[13px] text-white/45 hover:text-white/65 transition-colors"
           >
             다시 테스트하기
           </button>
@@ -541,7 +756,7 @@ export default function ResultScreen({ result, gender, onRestart }: ResultScreen
       <ShareModal
         isOpen={shareModalOpen}
         onClose={() => setShareModalOpen(false)}
-        resultScreenRef={resultScreenRef}
+        resultScreenRef={captureRef}
         resultData={{
           percentile: result.percentile,
           grade: result.grade,
@@ -584,6 +799,59 @@ export default function ResultScreen({ result, gender, onRestart }: ResultScreen
               </div>
             </div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 모바일 이미지 길게 눌러 저장 유도 모달 */}
+      <AnimatePresence>
+        {mobileSaveImage && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/95 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="relative w-full max-w-sm rounded-3xl p-6 overflow-hidden flex flex-col items-center"
+              style={{
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.37)',
+              }}
+            >
+              <button
+                onClick={closeMobileSaveModal}
+                className="absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors pointer-events-auto"
+              >
+                <X className="w-4 h-4 text-white" />
+              </button>
+
+              <div className="text-center mt-2 mb-4">
+                <h3 className="text-[18px] font-bold text-white mb-1">
+                  {mobileSaveContext === 'instagram' ? '인스타 스토리 공유하기' : '갤러리(사진첩)에 저장하기'}
+                </h3>
+                <p className="text-[12px] text-white/60">
+                  아래 이미지를 꾹 누르면 저장 메뉴가 나타납니다.
+                </p>
+              </div>
+
+              {/* 이미지 꾹 누르기 프레임 */}
+              <div className="relative w-full aspect-[9/16] max-h-[50vh] rounded-2xl overflow-y-auto border border-white/10 bg-black/40 shadow-inner flex items-start justify-center p-2 mb-4 pointer-events-auto">
+                <img
+                  src={mobileSaveImage}
+                  alt="결과 화면"
+                  className="w-full h-auto rounded-lg select-all object-contain"
+                  style={{ WebkitTouchCallout: 'default' }}
+                />
+              </div>
+
+              <div className="w-full text-center py-2 px-4 rounded-xl bg-white/5 border border-white/5 animate-pulse">
+                <span className="text-[12px] text-red-400 font-semibold">
+                  {mobileSaveContext === 'instagram' 
+                    ? '💡 이미지를 3초간 길게 눌러 저장 후, 인스타 스토리에서 업로드하세요!' 
+                    : '💡 이미지를 3초간 길게 눌러 사진 앱에 추가하세요'}
+                </span>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </div>
