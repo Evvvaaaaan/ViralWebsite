@@ -231,6 +231,7 @@ export default function ResultScreen({
   const [showRankChange, setShowRankChange] = useState(false);
   const [newPercentile, setNewPercentile] = useState(result.percentile);
   const [isCapturing, setIsCapturing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [mobileSaveImage, setMobileSaveImage] = useState<string | null>(null);
   const [mobileSaveContext, setMobileSaveContext] = useState<
     "instagram" | "save" | null
@@ -371,19 +372,34 @@ export default function ResultScreen({
     logGAEvent("image_save_clicked", "engagement", "Quick Actions");
     logUserEvent("image_save_clicked", { source: "result_page" });
     try {
-      setIsCapturing(true);
+      setIsSaving(true);
       const blob = await createResultImageBlob(getResultImageData());
-      setIsCapturing(false);
+      setIsSaving(false);
 
-      const fileName = `순위테스트-결과-상위${result.percentile}%-${Date.now()}.png`;
-      downloadImageBlob(blob, fileName);
+      if (!blob) return;
 
       if (isMobile()) {
+        const file = new File([blob], `순위테스트-결과-상위${result.percentile}%.png`, { type: "image/png" });
+        if (
+          navigator.share &&
+          navigator.canShare &&
+          navigator.canShare({ files: [file] })
+        ) {
+          try {
+            await navigator.share({ files: [file], title: "전국 순위 테스트 결과" });
+            return;
+          } catch (shareErr) {
+            if ((shareErr as Error).name === "AbortError") return;
+          }
+        }
         setMobileSaveImage(URL.createObjectURL(blob));
         setMobileSaveContext("save");
+      } else {
+        const fileName = `순위테스트-결과-상위${result.percentile}%-${Date.now()}.png`;
+        downloadImageBlob(blob, fileName);
       }
     } catch (err) {
-      setIsCapturing(false);
+      setIsSaving(false);
       console.error("Download failed:", err);
     }
   };
@@ -471,7 +487,7 @@ export default function ResultScreen({
   });
 
   return (
-    <div className="w-full min-h-screen overflow-y-auto relative">
+    <div className="w-full min-h-screen relative">
       {/* Animated background for S grade */}
       {isTopRank && (
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
@@ -835,7 +851,7 @@ export default function ResultScreen({
           <motion.button
             whileTap={{ scale: 0.97 }}
             onClick={handleQuickDownload}
-            disabled={isCapturing}
+            disabled={isSaving}
             className="w-full py-3.5 rounded-2xl font-semibold text-[15px] flex items-center justify-center gap-2"
             style={{
               background: "rgba(255, 255, 255, 0.08)",
@@ -843,7 +859,7 @@ export default function ResultScreen({
               color: "white",
             }}
           >
-            {isCapturing ? (
+            {isSaving ? (
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
               <Download className="w-4 h-4" strokeWidth={2} />

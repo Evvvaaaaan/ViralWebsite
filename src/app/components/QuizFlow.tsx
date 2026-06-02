@@ -163,7 +163,7 @@ export default function QuizFlow() {
   };
 
   return (
-    <div className="w-full min-h-screen overflow-x-hidden" style={{
+    <div className="w-full min-h-dvh overflow-x-hidden" style={{
       background: currentScreen === 'landing' ? '#000000' :
                  currentScreen === 'gender' || currentScreen === 'age' ? 'var(--cosmic-deep)' :
                  currentScreen === 'loading' ? 'linear-gradient(180deg, #000000 0%, var(--cosmic-deep) 100%)' :

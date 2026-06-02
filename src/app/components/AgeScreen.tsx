@@ -34,7 +34,7 @@ export default function AgeScreen({ onSelect }: AgeScreenProps) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="w-full min-h-screen flex flex-col items-center justify-center px-6 py-12 relative overflow-hidden"
+      className="w-full min-h-dvh flex flex-col items-center justify-center px-6 py-6 sm:py-10 relative overflow-hidden"
       style={{
         background: 'var(--cosmic-deep)',
         transition: 'background 0.4s ease',
@@ -64,7 +64,7 @@ export default function AgeScreen({ onSelect }: AgeScreenProps) {
         />
       </div>
 
-      <div className="max-w-md w-full relative z-10 text-center mb-8 sm:mb-10">
+      <div className="max-w-md w-full relative z-10 text-center mb-5 sm:mb-8">
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
