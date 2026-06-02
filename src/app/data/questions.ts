@@ -362,7 +362,7 @@ export const adultQuestions: Question[] = [
     question: "하루 평균 스마트폰으로 유튜브, 쇼츠, SNS를 사용하는 시간은?",
     type: "scale",
     scaleType: "slider",
-    options: ["4시간 이상", "2~4시간", "1~2시간", "30분~1시간", "30분 이하"],
+    options: ["6시간 이상", "4~6시간", "2~4시간", "1~2시간", "1시간 이하"],
   },
   {
     id: 22,
@@ -875,7 +875,7 @@ export const teenQuestions: Question[] = [
     question: "하루 평균 유튜브, 쇼츠, SNS, 게임 사용 시간은?",
     type: "scale",
     scaleType: "slider",
-    options: ["4시간 이상", "2~4시간", "1~2시간", "30분~1시간", "30분 이하"],
+    options: ["6시간 이상", "4~6시간", "2~4시간", "1~2시간", "1시간 이하"],
   },
   {
     id: 22,

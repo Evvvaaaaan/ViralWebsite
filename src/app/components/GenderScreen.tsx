@@ -29,7 +29,7 @@ export default function GenderScreen({ onSelect }: GenderScreenProps) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="w-full min-h-screen flex flex-col sm:flex-row relative overflow-hidden"
+      className="w-full min-h-dvh flex flex-col sm:flex-row relative overflow-hidden"
       style={{
         background: activeGender === 'male'
           ? 'rgba(99, 102, 241, 0.08)'

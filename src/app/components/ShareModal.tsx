@@ -177,12 +177,21 @@ export default function ShareModal({ isOpen, onClose, resultData }: ShareModalPr
     }
     if (!blob) return;
 
-    const fileName = `순위테스트-결과-상위${resultData.percentile}%-${Date.now()}.png`;
-    downloadImageBlob(blob, fileName);
-
     if (isMobile()) {
+      const file = new File([blob], `순위테스트-결과-상위${resultData.percentile}%.png`, { type: 'image/png' });
+      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file], title: '전국 순위 테스트 결과' });
+          return;
+        } catch (err) {
+          if ((err as Error).name === 'AbortError') return;
+        }
+      }
       setMobileSaveImage(URL.createObjectURL(blob));
       setMobileSaveContext('save');
+    } else {
+      const fileName = `순위테스트-결과-상위${resultData.percentile}%-${Date.now()}.png`;
+      downloadImageBlob(blob, fileName);
     }
   };
 
