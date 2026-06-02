@@ -1,10 +1,14 @@
-import { useEffect, useState } from 'react';
-import { motion } from 'motion/react';
-import { Link } from 'react-router';
-import { getTotalParticipants, incrementParticipants, getCurrentOnlineUsers } from '../utils/engagement';
-import EngagementToast from './EngagementToast';
-import { logGAEvent } from '../utils/analytics';
-import { logUserEvent } from '../utils/apiClient';
+import { useEffect, useState } from "react";
+import { motion } from "motion/react";
+import { Link } from "react-router";
+import {
+  getTotalParticipants,
+  incrementParticipants,
+  getCurrentOnlineUsers,
+} from "../utils/engagement";
+import EngagementToast from "./EngagementToast";
+import { logGAEvent } from "../utils/analytics";
+import { logUserEvent } from "../utils/apiClient";
 
 interface LandingScreenProps {
   onStart: () => void;
@@ -14,8 +18,8 @@ export default function LandingScreen({ onStart }: LandingScreenProps) {
   const [liveCount, setLiveCount] = useState(0);
 
   const handleStart = () => {
-    logGAEvent('quiz_start_clicked', 'engagement', 'Landing Screen');
-    logUserEvent('quiz_start_clicked', { source: 'landing_button' });
+    logGAEvent("quiz_start_clicked", "engagement", "Landing Screen");
+    logUserEvent("quiz_start_clicked", { source: "landing_button" });
     onStart();
   };
   const [participants, setParticipants] = useState(0);
@@ -58,18 +62,30 @@ export default function LandingScreen({ onStart }: LandingScreenProps) {
   // 보고서 명세: 실시간 결과 피드 - 지역 + 성별 + 결과
   const generateRecentResults = () => {
     const feed = [];
-    const regions = ['서울', '경기', '부산', '인천', '대구', '광주', '대전', '울산', '강원', '제주'];
-    const genders = ['남성', '여성'];
-    
+    const regions = [
+      "서울",
+      "경기",
+      "부산",
+      "인천",
+      "대구",
+      "광주",
+      "대전",
+      "울산",
+      "강원",
+      "제주",
+    ];
+    const genders = ["남성", "여성"];
+
     for (let i = 0; i < 12; i++) {
       const region = regions[Math.floor(Math.random() * regions.length)];
       const gender = genders[Math.floor(Math.random() * genders.length)];
       const percentile = Math.floor(Math.random() * 100) + 1;
-      const action = percentile <= 5 ? '달성' : percentile <= 50 ? '판정' : '확인';
-      
+      const action =
+        percentile <= 5 ? "달성" : percentile <= 50 ? "판정" : "확인";
+
       feed.push(`${region} · ${gender} · 상위 ${percentile}% ${action}`);
     }
-    
+
     return feed;
   };
 
@@ -83,13 +99,22 @@ export default function LandingScreen({ onStart }: LandingScreenProps) {
         animate={{ opacity: 1, y: 0 }}
         className="absolute top-4 right-4 sm:top-6 sm:right-6 z-20 flex gap-4 text-[13px]"
       >
-        <Link to="/leaderboard" className="text-white/65 hover:text-white transition-colors">
+        <Link
+          to="/leaderboard"
+          className="text-white/65 hover:text-white transition-colors"
+        >
           리더보드
         </Link>
-        <Link to="/about" className="text-white/65 hover:text-white transition-colors">
+        <Link
+          to="/about"
+          className="text-white/65 hover:text-white transition-colors"
+        >
           소개
         </Link>
-        <Link to="/stats" className="text-white/65 hover:text-white transition-colors">
+        <Link
+          to="/stats"
+          className="text-white/65 hover:text-white transition-colors"
+        >
           통계
         </Link>
       </motion.div>
@@ -112,7 +137,7 @@ export default function LandingScreen({ onStart }: LandingScreenProps) {
             transition={{
               duration: 3 + Math.random() * 4,
               repeat: Infinity,
-              ease: 'easeInOut',
+              ease: "easeInOut",
             }}
           />
         ))}
@@ -126,7 +151,7 @@ export default function LandingScreen({ onStart }: LandingScreenProps) {
           className="w-[280px] h-[280px] sm:w-[380px] sm:h-[380px] object-contain rounded-[40px] shadow-[0_0_80px_rgba(255,255,255,0.05)] border border-white/10"
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 0.1 }}
-          transition={{ duration: 1.5, ease: 'easeOut' }}
+          transition={{ duration: 1.5, ease: "easeOut" }}
         />
       </div>
 
@@ -156,14 +181,14 @@ export default function LandingScreen({ onStart }: LandingScreenProps) {
           <h1
             className="text-[32px] sm:text-[40px] md:text-[48px] font-semibold leading-[1.07] mb-4"
             style={{
-              letterSpacing: '-0.025em',
-              textShadow: '0 0 80px rgba(99, 102, 241, 0.4)'
+              letterSpacing: "-0.025em",
+              textShadow: "0 0 80px rgba(99, 102, 241, 0.4)",
             }}
           >
-            <span className="text-white">나는 전국에서</span>
+            <span className="text-white">나는 7의</span>
             <br />
-            <span className="text-white">몇 번째인가</span>
-            <span style={{ color: 'var(--action-blue)' }}>?</span>
+            <span className="text-white">남자 · 여자 인가</span>
+            <span style={{ color: "var(--action-blue)" }}>?</span>
           </h1>
           <p className="text-[15px] sm:text-[17px] text-white/65 leading-[1.6] tracking-[-0.01em]">
             25개의 문항으로 확인하는
@@ -181,8 +206,8 @@ export default function LandingScreen({ onStart }: LandingScreenProps) {
           <div className="relative h-8 overflow-hidden">
             <motion.div
               className="flex gap-6 absolute whitespace-nowrap text-[13px] text-white/35"
-              animate={{ x: ['0%', '-50%'] }}
-              transition={{ duration: 20, repeat: Infinity, ease: 'linear' }}
+              animate={{ x: ["0%", "-50%"] }}
+              transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
             >
               {[...recentResults, ...recentResults].map((result, i) => (
                 <span key={i}>{result}</span>
@@ -198,7 +223,9 @@ export default function LandingScreen({ onStart }: LandingScreenProps) {
           className="flex items-center gap-4 sm:gap-6 mb-8 sm:mb-12 text-[14px] sm:text-[15px]"
         >
           <div className="text-center">
-            <div className="text-white font-medium">{displayParticipants.toLocaleString()}</div>
+            <div className="text-white font-medium">
+              {displayParticipants.toLocaleString()}
+            </div>
             <div className="text-white/45 text-[13px]">참여자</div>
           </div>
           <div className="w-[1px] h-8 bg-white/15" />
@@ -227,7 +254,7 @@ export default function LandingScreen({ onStart }: LandingScreenProps) {
             animate={{ scale: [1, 1.015, 1] }}
             transition={{ duration: 3, repeat: Infinity }}
             style={{
-              boxShadow: '0 20px 60px rgba(255, 255, 255, 0.2)',
+              boxShadow: "0 20px 60px rgba(255, 255, 255, 0.2)",
             }}
           >
             지금 내 순위 확인 →
@@ -237,7 +264,6 @@ export default function LandingScreen({ onStart }: LandingScreenProps) {
           </p>
         </motion.div>
       </div>
-
 
       {/* Engagement Toast */}
       <EngagementToast />
