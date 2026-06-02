@@ -37,5 +37,5 @@ export const router = createBrowserRouter([
     Component: DownloadPage,
   },
 ], {
-  basename: "/percenteme"
+  basename: "/percentme"
 });
