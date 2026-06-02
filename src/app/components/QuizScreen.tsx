@@ -900,6 +900,7 @@ function SectionCompletionCard({
         animate={{ scale: [0, 1.2, 1] }}
         transition={{ duration: 0.5, times: [0, 0.6, 1] }}
         className="text-[64px] mb-6"
+        style={{ color: textColor }}
       >
         {isHalfway ? "🎯" : "✓"}
       </motion.div>
