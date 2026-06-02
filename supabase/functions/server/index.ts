@@ -89,71 +89,80 @@ app.post("/make-server-2ae6dc9b/init-mock-data", async (c) => {
 
 // 결과 저장
 app.post("/make-server-2ae6dc9b/results", async (c) => {
+  let body: any;
   try {
-    const body = await c.req.json();
-    const { gender, total, categories, region, ageGroup } = body;
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: 'Invalid JSON body' }, 400);
+  }
 
-    if (!gender || !total || !categories) {
-      return c.json({ error: 'Missing required fields' }, 400);
-    }
+  const { gender, total, categories, region, ageGroup } = body;
 
-    const id = `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const resultData = {
-      id,
-      gender,
-      total,
-      categories,
-      timestamp: Date.now(),
-      isMock: false,
-      region: region || '서울/경기',
-      ageGroup: ageGroup || '20대',
-    };
+  if (!gender || total == null || !categories) {
+    return c.json({ error: 'Missing required fields' }, 400);
+  }
 
+  const id = `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  const resultData = {
+    id,
+    gender,
+    total,
+    categories,
+    timestamp: Date.now(),
+    isMock: false,
+    region: region || '서울/경기',
+    ageGroup: ageGroup || '20대',
+  };
+
+  // 저장 실패 시 500 반환 (클라이언트 재시도 방지를 위해 저장과 순위 계산을 분리)
+  try {
     await kv.set(`result:${id}`, resultData);
-
-    // 순위 계산
-    const allResults = await kv.getByPrefix('result:');
-    const rankings = calculateRankings(resultData, allResults);
-
-    console.log(`Saved result ${id} with rankings:`, rankings);
-    return c.json({ success: true, id, rankings });
   } catch (error) {
     console.error('Error saving result:', error);
     return c.json({ error: String(error) }, 500);
   }
+
+  // 순위 계산은 저장 성공 후 독립적으로 시도 (실패해도 저장된 데이터에 영향 없음)
+  let rankings = null;
+  try {
+    const allResults = await kv.getByPrefix('result:');
+    rankings = calculateRankings(resultData, allResults);
+    console.log(`Saved result ${id} with rankings:`, rankings);
+  } catch (error) {
+    console.warn(`Ranking calculation failed for ${id}, returning without rankings:`, error);
+  }
+
+  return c.json({ success: true, id, rankings });
 });
 
 // 순위 계산 로직
 function calculateRankings(userResult: any, allResults: any[]) {
   const { gender, total, region, ageGroup } = userResult;
 
-  // 전국 순위
   const sameGenderResults = allResults.filter((r: any) => r.gender === gender);
   const betterCount = sameGenderResults.filter((r: any) => r.total > total).length;
-  const national = Math.max(0.1, ((betterCount / sameGenderResults.length) * 100).toFixed(1));
+  const national = Math.max(0.1, parseFloat(((betterCount / Math.max(1, sameGenderResults.length)) * 100).toFixed(1)));
 
-  // 지역 순위 (region이 있을 때만)
   let regionalPercentile = null;
   if (region) {
     const sameRegionResults = sameGenderResults.filter((r: any) => r.region === region);
     const betterRegionCount = sameRegionResults.filter((r: any) => r.total > total).length;
     regionalPercentile = sameRegionResults.length > 0
-      ? parseFloat(Math.max(0.1, ((betterRegionCount / sameRegionResults.length) * 100).toFixed(1)))
-      : parseFloat(national);
+      ? Math.max(0.1, parseFloat(((betterRegionCount / sameRegionResults.length) * 100).toFixed(1)))
+      : national;
   }
 
-  // 연령대 순위 (ageGroup이 있을 때만)
   let agePercentile = null;
   if (ageGroup) {
     const sameAgeResults = sameGenderResults.filter((r: any) => r.ageGroup === ageGroup);
     const betterAgeCount = sameAgeResults.filter((r: any) => r.total > total).length;
     agePercentile = sameAgeResults.length > 0
-      ? parseFloat(Math.max(0.1, ((betterAgeCount / sameAgeResults.length) * 100).toFixed(1)))
-      : parseFloat(national);
+      ? Math.max(0.1, parseFloat(((betterAgeCount / sameAgeResults.length) * 100).toFixed(1)))
+      : national;
   }
 
   return {
-    national: parseFloat(national),
+    national,
     region: regionalPercentile,
     ageGroup: agePercentile,
     totalCount: sameGenderResults.length,

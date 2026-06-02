@@ -9,42 +9,9 @@ export default function LeaderboardPage() {
   const [activeTab, setActiveTab] = useState<'all' | 'male' | 'female'>('all');
   const [isLoading, setIsLoading] = useState(true);
   const [leaderboards, setLeaderboards] = useState<any>({
-    all: [
-      { rank: 1, name: '익명', score: 9.87, gender: 'male' },
-      { rank: 2, name: '익명', score: 9.45, gender: 'female' },
-      { rank: 3, name: '익명', score: 9.23, gender: 'male' },
-      { rank: 4, name: '익명', score: 8.91, gender: 'female' },
-      { rank: 5, name: '익명', score: 8.76, gender: 'male' },
-      { rank: 6, name: '익명', score: 8.54, gender: 'female' },
-      { rank: 7, name: '익명', score: 8.32, gender: 'male' },
-      { rank: 8, name: '익명', score: 8.10, gender: 'female' },
-      { rank: 9, name: '익명', score: 7.98, gender: 'male' },
-      { rank: 10, name: '익명', score: 7.76, gender: 'female' },
-    ],
-    male: [
-      { rank: 1, name: '익명', score: 9.87, gender: 'male' },
-      { rank: 2, name: '익명', score: 9.23, gender: 'male' },
-      { rank: 3, name: '익명', score: 8.76, gender: 'male' },
-      { rank: 4, name: '익명', score: 8.32, gender: 'male' },
-      { rank: 5, name: '익명', score: 7.98, gender: 'male' },
-      { rank: 6, name: '익명', score: 7.45, gender: 'male' },
-      { rank: 7, name: '익명', score: 7.21, gender: 'male' },
-      { rank: 8, name: '익명', score: 6.98, gender: 'male' },
-      { rank: 9, name: '익명', score: 6.76, gender: 'male' },
-      { rank: 10, name: '익명', score: 6.54, gender: 'male' },
-    ],
-    female: [
-      { rank: 1, name: '익명', score: 9.45, gender: 'female' },
-      { rank: 2, name: '익명', score: 8.91, gender: 'female' },
-      { rank: 3, name: '익명', score: 8.54, gender: 'female' },
-      { rank: 4, name: '익명', score: 8.10, gender: 'female' },
-      { rank: 5, name: '익명', score: 7.76, gender: 'female' },
-      { rank: 6, name: '익명', score: 7.43, gender: 'female' },
-      { rank: 7, name: '익명', score: 7.12, gender: 'female' },
-      { rank: 8, name: '익명', score: 6.87, gender: 'female' },
-      { rank: 9, name: '익명', score: 6.65, gender: 'female' },
-      { rank: 10, name: '익명', score: 6.32, gender: 'female' },
-    ],
+    all: [],
+    male: [],
+    female: [],
   });
 
   useEffect(() => {
@@ -55,9 +22,9 @@ export default function LeaderboardPage() {
         if (response.success && response.data && active) {
           const { all, male, female } = response.data;
           setLeaderboards({
-            all: all && all.length > 0 ? all : leaderboards.all,
-            male: male && male.length > 0 ? male : leaderboards.male,
-            female: female && female.length > 0 ? female : leaderboards.female,
+            all: all || [],
+            male: male || [],
+            female: female || [],
           });
         }
       } catch (err) {
@@ -189,84 +156,92 @@ export default function LeaderboardPage() {
 
           {/* Leaderboard */}
           <div className="bg-white rounded-xl md:rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
-            {currentData.map((entry: any, idx: number) => {
-              const isMe = entry.id && entry.id === myId;
-              const shouldAnimate = idx < 30;
+            {currentData.length === 0 ? (
+              <div className="p-8 md:p-12 text-center flex flex-col items-center justify-center bg-white">
+                <Trophy className="w-12 h-12 text-gray-300 mb-3 animate-pulse" />
+                <p className="text-gray-500 font-semibold text-[15px] mb-1">등록된 순위 데이터가 없습니다.</p>
+                <p className="text-gray-400 text-[13px]">첫 번째 순위 기록을 남겨보세요!</p>
+              </div>
+            ) : (
+              currentData.map((entry: any, idx: number) => {
+                const isMe = entry.id && entry.id === myId;
+                const shouldAnimate = idx < 30;
 
-              return (
-                <motion.div
-                  key={entry.id || idx}
-                  id={entry.id || undefined}
-                  initial={shouldAnimate ? { opacity: 0, x: -20 } : undefined}
-                  animate={shouldAnimate ? { opacity: 1, x: 0 } : undefined}
-                  transition={shouldAnimate ? { delay: Math.min(idx, 15) * 0.04 } : undefined}
-                  className={`flex items-center gap-2 md:gap-4 p-3 md:p-4 transition-all duration-300 border-b border-gray-100 last:border-0 relative ${
-                    isMe ? 'bg-blue-50/70 border-l-4 border-l-blue-500 shadow-inner' : 'hover:bg-gray-50'
-                  }`}
-                  style={{
-                    scrollMargin: '100px'
-                  }}
-                >
-                  {/* Rank */}
-                  <div className="w-8 md:w-12 flex-shrink-0 flex items-center justify-center">
-                    {entry.rank === 1 && (
-                      <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-gradient-to-br from-yellow-400 to-yellow-600 flex items-center justify-center shadow-sm">
-                        <Trophy className="w-4 h-4 md:w-5 md:h-5 text-white" />
-                      </div>
-                    )}
-                    {entry.rank === 2 && (
-                      <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-gradient-to-br from-gray-300 to-gray-500 flex items-center justify-center shadow-sm">
-                        <Medal className="w-4 h-4 md:w-5 md:h-5 text-white" />
-                      </div>
-                    )}
-                    {entry.rank === 3 && (
-                      <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center shadow-sm">
-                        <Award className="w-4 h-4 md:w-5 md:h-5 text-white" />
-                      </div>
-                    )}
-                    {entry.rank > 3 && (
-                      <div className="text-[14px] md:text-[16px] font-semibold text-gray-400">
-                        {entry.rank}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Avatar */}
-                  <div className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center flex-shrink-0 bg-gradient-to-br ${
-                    isMe ? 'from-blue-500 to-blue-600' : 'from-blue-400 to-purple-500'
-                  }`}>
-                    {entry.gender === 'male' ? (
-                      <User className="w-5 h-5 md:w-6 md:h-6 text-white" />
-                    ) : (
-                      <Users className="w-5 h-5 md:w-6 md:h-6 text-white" />
-                    )}
-                  </div>
-
-                  {/* Name */}
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[14px] md:text-[15px] font-semibold text-gray-800 flex items-center flex-wrap gap-1">
-                      {isMe ? '나 (내 기록)' : entry.name}
-                      {isMe && (
-                        <span className="text-[10px] sm:text-[11px] font-bold text-white bg-blue-500 px-2.5 py-0.5 rounded-full shadow-[0_2px_5px_rgba(59,130,246,0.3)] animate-pulse">
-                          MY
-                        </span>
+                return (
+                  <motion.div
+                    key={entry.id || idx}
+                    id={entry.id || undefined}
+                    initial={shouldAnimate ? { opacity: 0, x: -20 } : undefined}
+                    animate={shouldAnimate ? { opacity: 1, x: 0 } : undefined}
+                    transition={shouldAnimate ? { delay: Math.min(idx, 15) * 0.04 } : undefined}
+                    className={`flex items-center gap-2 md:gap-4 p-3 md:p-4 transition-all duration-300 border-b border-gray-100 last:border-0 relative ${
+                      isMe ? 'bg-blue-50/70 border-l-4 border-l-blue-500 shadow-inner' : 'hover:bg-gray-50'
+                    }`}
+                    style={{
+                      scrollMargin: '100px'
+                    }}
+                  >
+                    {/* Rank */}
+                    <div className="w-8 md:w-12 flex-shrink-0 flex items-center justify-center">
+                      {entry.rank === 1 && (
+                        <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-gradient-to-br from-yellow-400 to-yellow-600 flex items-center justify-center shadow-sm">
+                          <Trophy className="w-4 h-4 md:w-5 md:h-5 text-white" />
+                        </div>
+                      )}
+                      {entry.rank === 2 && (
+                        <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-gradient-to-br from-gray-300 to-gray-500 flex items-center justify-center shadow-sm">
+                          <Medal className="w-4 h-4 md:w-5 md:h-5 text-white" />
+                        </div>
+                      )}
+                      {entry.rank === 3 && (
+                        <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center shadow-sm">
+                          <Award className="w-4 h-4 md:w-5 md:h-5 text-white" />
+                        </div>
+                      )}
+                      {entry.rank > 3 && (
+                        <div className="text-[14px] md:text-[16px] font-semibold text-gray-400">
+                          {entry.rank}
+                        </div>
                       )}
                     </div>
-                    <div className="text-[12px] md:text-[13px] text-gray-500">
-                      {entry.gender === 'male' ? '남성' : '여성'}
-                    </div>
-                  </div>
 
-                  {/* Score */}
-                  <div className="text-right flex-shrink-0">
-                    <div className={`text-[18px] md:text-[20px] font-bold ${isMe ? 'text-blue-600' : 'text-gray-800'}`}>
-                      {entry.score.toFixed(2)}
+                    {/* Avatar */}
+                    <div className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center flex-shrink-0 bg-gradient-to-br ${
+                      isMe ? 'from-blue-500 to-blue-600' : 'from-blue-400 to-purple-500'
+                    }`}>
+                      {entry.gender === 'male' ? (
+                        <User className="w-5 h-5 md:w-6 md:h-6 text-white" />
+                      ) : (
+                        <Users className="w-5 h-5 md:w-6 md:h-6 text-white" />
+                      )}
                     </div>
-                    <div className="text-[11px] md:text-[12px] text-gray-500">점수</div>
-                  </div>
-                </motion.div>
-              );
-            })}
+
+                    {/* Name */}
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[14px] md:text-[15px] font-semibold text-gray-800 flex items-center flex-wrap gap-1">
+                        {isMe ? '나 (내 기록)' : entry.name}
+                        {isMe && (
+                          <span className="text-[10px] sm:text-[11px] font-bold text-white bg-blue-500 px-2.5 py-0.5 rounded-full shadow-[0_2px_5px_rgba(59,130,246,0.3)] animate-pulse">
+                            MY
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[12px] md:text-[13px] text-gray-500">
+                        {entry.gender === 'male' ? '남성' : '여성'}
+                      </div>
+                    </div>
+
+                    {/* Score */}
+                    <div className="text-right flex-shrink-0">
+                      <div className={`text-[18px] md:text-[20px] font-bold ${isMe ? 'text-blue-600' : 'text-gray-800'}`}>
+                        {entry.score.toFixed(2)}
+                      </div>
+                      <div className="text-[11px] md:text-[12px] text-gray-500">점수</div>
+                    </div>
+                  </motion.div>
+                );
+              })
+            )}
           </div>
 
           {/* CTA */}
