@@ -388,6 +388,22 @@ function drawInsight(
   });
 }
 
+export function isMobile(): boolean {
+  return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+}
+
+export function downloadImageBlob(blob: Blob, fileName: string): void {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.download = fileName;
+  link.href = url;
+  link.style.display = 'none';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 export async function createResultImageBlob(data: ResultImageData) {
   const canvas = document.createElement("canvas");
   canvas.width = WIDTH * SCALE;

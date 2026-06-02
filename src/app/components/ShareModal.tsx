@@ -1,10 +1,12 @@
 import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Download, Link as LinkIcon, Check, Share, MessageCircle, Loader2 } from 'lucide-react';
+import { X, Download, Link as LinkIcon, Check, MessageCircle, Loader2 } from 'lucide-react';
 import { logGAEvent } from '../utils/analytics';
 import { logUserEvent } from '../utils/apiClient';
-import { createResultImageBlob } from '../utils/resultImage';
+import { createResultImageBlob, downloadImageBlob, isMobile } from '../utils/resultImage';
 import type { ResultImageData } from '../utils/resultImage';
+import InstagramIcon from './InstagramIcon';
+import MobileSaveModal from './MobileSaveModal';
 
 interface ShareModalProps {
   isOpen: boolean;
@@ -23,19 +25,10 @@ interface ShareModalProps {
   };
 }
 
-const InstagramIcon = ({ className = "w-6 h-6" }: { className?: string }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
-    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
-    <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
-  </svg>
-);
-
 export default function ShareModal({ isOpen, onClose, resultData }: ShareModalProps) {
   const [shareUrl, setShareUrl] = useState('');
   const [copied, setCopied] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
-  const [captureReady, setCaptureReady] = useState(false);
   const [imageBlob, setImageBlob] = useState<Blob | null>(null);
   const [mobileSaveImage, setMobileSaveImage] = useState<string | null>(null);
   const [mobileSaveContext, setMobileSaveContext] = useState<'instagram' | 'save' | null>(null);
@@ -48,29 +41,16 @@ export default function ShareModal({ isOpen, onClose, resultData }: ShareModalPr
     }
   };
 
-  const downloadImageBlob = (blob: Blob, fileName: string) => {
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.download = fileName;
-    link.href = url;
-    link.style.display = 'none';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-  };
-
   useEffect(() => {
     if (isOpen) {
       logGAEvent('share_modal_opened', 'engagement', 'Share Modal');
       logUserEvent('share_modal_opened');
       const url = 'https://lyralab.site/percentme';
       setShareUrl(url);
-      setCaptureReady(false);
       setImageBlob(null);
 
       // Pre-capture image in background
-      captureResultImage().then(() => setCaptureReady(true));
+      captureResultImage();
     }
   }, [isOpen]);
 
@@ -101,9 +81,8 @@ export default function ShareModal({ isOpen, onClose, resultData }: ShareModalPr
     if (!blob) return;
 
     const file = new File([blob], 'quiz-result.png', { type: 'image/png' });
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
-    if (isMobile && navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+    if (isMobile() && navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
       try {
         await navigator.share({
           files: [file],
@@ -139,8 +118,7 @@ export default function ShareModal({ isOpen, onClose, resultData }: ShareModalPr
       }
     }
 
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-    if (isMobile) {
+    if (isMobile()) {
       window.location.href = `kakaotalk://send?msg=${encodeURIComponent(`${text}\n${shareUrl}`)}`;
       return;
     }
@@ -199,14 +177,11 @@ export default function ShareModal({ isOpen, onClose, resultData }: ShareModalPr
     }
     if (!blob) return;
 
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     const fileName = `순위테스트-결과-상위${resultData.percentile}%-${Date.now()}.png`;
-
     downloadImageBlob(blob, fileName);
 
-    if (isMobile) {
-      const url = URL.createObjectURL(blob);
-      setMobileSaveImage(url);
+    if (isMobile()) {
+      setMobileSaveImage(URL.createObjectURL(blob));
       setMobileSaveContext('save');
     }
   };
@@ -338,54 +313,13 @@ export default function ShareModal({ isOpen, onClose, resultData }: ShareModalPr
 
           {/* 모바일 이미지 길게 눌러 저장 유도 모달 */}
           <AnimatePresence>
-            {mobileSaveImage && (
-              <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/95 backdrop-blur-md pointer-events-auto">
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  className="relative w-full max-w-sm rounded-3xl p-6 overflow-hidden flex flex-col items-center"
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.05)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.37)',
-                  }}
-                >
-                  <button
-                    onClick={closeMobileSaveModal}
-                    className="absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors pointer-events-auto"
-                  >
-                    <X className="w-4 h-4 text-white" />
-                  </button>
-
-                  <div className="text-center mt-2 mb-4">
-                    <h3 className="text-[18px] font-bold text-white mb-1">
-                      {mobileSaveContext === 'instagram' ? '인스타 스토리 공유하기' : '갤러리(사진첩)에 저장하기'}
-                    </h3>
-                    <p className="text-[12px] text-white/60">
-                      아래 이미지를 꾹 누르면 저장 메뉴가 나타납니다.
-                    </p>
-                  </div>
-
-                  {/* 이미지 꾹 누르기 프레임 */}
-                  <div className="relative w-full aspect-[9/16] max-h-[50vh] rounded-2xl overflow-y-auto border border-white/10 bg-black/40 shadow-inner flex items-start justify-center p-2 mb-4 pointer-events-auto">
-                    <img
-                      src={mobileSaveImage}
-                      alt="결과 화면"
-                      className="w-full h-auto rounded-lg select-all object-contain"
-                      style={{ WebkitTouchCallout: 'default' }}
-                    />
-                  </div>
-
-                  <div className="w-full text-center py-2 px-4 rounded-xl bg-white/5 border border-white/5 animate-pulse">
-                    <span className="text-[12px] text-red-400 font-semibold">
-                      {mobileSaveContext === 'instagram' 
-                        ? '💡 이미지를 3초간 길게 눌러 저장 후, 인스타 스토리에서 업로드하세요!' 
-                        : '💡 이미지를 3초간 길게 눌러 사진 앱에 추가하세요'}
-                    </span>
-                  </div>
-                </motion.div>
-              </div>
+            {mobileSaveImage && mobileSaveContext && (
+              <MobileSaveModal
+                imageUrl={mobileSaveImage}
+                context={mobileSaveContext}
+                onClose={closeMobileSaveModal}
+                zIndex="z-[60]"
+              />
             )}
           </AnimatePresence>
         </>
