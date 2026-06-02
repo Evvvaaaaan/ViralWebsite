@@ -185,19 +185,18 @@ export default function LandingScreen({ onStart }: LandingScreenProps) {
               textShadow: "0 0 80px rgba(99, 102, 241, 0.4)",
             }}
           >
-            <span className="text-white">나는 7의</span>
+            <span className="text-white">나는 10의</span>
             <br />
             <span className="text-white">
-              <span style={{ color: "var(--action-blue)" }}>남</span> ·{" "}
-              <span style={{ color: "var(--action-pink)" }}>여자</span>
-              인가
+              <span style={{ color: "#6496e6" }}>남</span> ·{" "}
+              <span style={{ color: "#e489b7" }}>여</span>자 일까
             </span>
             <span>?</span>
           </h1>
           <p className="text-[15px] sm:text-[17px] text-white/65 leading-[1.6] tracking-[-0.01em]">
-            25개의 문항으로 확인하는
+            전국 5000만명 중,
             <br />
-            대한민국 실시간 순위 테스트
+            당신은 상위 몇 %입니까?
           </p>
         </motion.div>
 
