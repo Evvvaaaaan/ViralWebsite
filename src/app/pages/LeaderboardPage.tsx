@@ -156,7 +156,13 @@ export default function LeaderboardPage() {
 
           {/* Leaderboard */}
           <div className="bg-white rounded-xl md:rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
-            {currentData.length === 0 ? (
+            {isLoading ? (
+              <div className="p-12 md:p-16 text-center flex flex-col items-center justify-center bg-white">
+                <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4" />
+                <p className="text-gray-600 font-semibold text-[15px] mb-1">데이터를 불러오는 중입니다...</p>
+                <p className="text-gray-400 text-[13px] animate-pulse">실시간 순위표를 동기화하고 있습니다.</p>
+              </div>
+            ) : currentData.length === 0 ? (
               <div className="p-8 md:p-12 text-center flex flex-col items-center justify-center bg-white">
                 <Trophy className="w-12 h-12 text-gray-300 mb-3 animate-pulse" />
                 <p className="text-gray-500 font-semibold text-[15px] mb-1">등록된 순위 데이터가 없습니다.</p>
