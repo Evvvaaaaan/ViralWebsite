@@ -38,7 +38,7 @@ const categoryTypes: Record<string, { adjective: string; noun: string }> = {
   selfCare: { adjective: "건강한", noun: "관리자" },
   economy: { adjective: "똑똑한", noun: "재테크형" },
   social: { adjective: "따뜻한", noun: "소셜형" },
-  lifestyle: { adjective: "감각적인", noun: "라이프러" },
+  lifestyle: { adjective: "감각적인", noun: "라이프형" },
   mindset: { adjective: "강인한", noun: "성장형" },
 };
 
@@ -149,10 +149,10 @@ function ResultRadarChart({
   color: string;
   fillOpacity: number;
 }) {
-  const size = 280;
+  const size = 320;
   const cx = size / 2;
   const cy = size / 2;
-  const radius = 84;
+  const radius = 100;
   const maxValue = 25;
 
   const point = (index: number, scale: number) => {
@@ -173,11 +173,12 @@ function ResultRadarChart({
 
   return (
     <svg
-      width={size}
-      height={size}
+      width="100%"
+      height="100%"
       viewBox={`0 0 ${size} ${size}`}
       role="img"
       aria-label="역량 분석 레이더 차트"
+      className="block"
     >
       {[1 / 3, 2 / 3, 1].map((scale) => (
         <polygon
@@ -197,8 +198,8 @@ function ResultRadarChart({
       {radarCategories.map(({ label }, index) => {
         const outer = point(index, 1);
         const angle = -Math.PI / 2 + (Math.PI * 2 * index) / radarCategories.length;
-        const labelX = cx + Math.cos(angle) * (radius + 34);
-        const labelY = cy + Math.sin(angle) * (radius + 34);
+        const labelX = cx + Math.cos(angle) * (radius + 38);
+        const labelY = cy + Math.sin(angle) * (radius + 38);
 
         return (
           <g key={label}>
@@ -216,7 +217,7 @@ function ResultRadarChart({
               dy="0.35em"
               textAnchor="middle"
               fill="rgba(255, 255, 255, 0.65)"
-              fontSize="11"
+              fontSize="12"
               fontWeight="500"
             >
               {label}
@@ -230,7 +231,7 @@ function ResultRadarChart({
         fill={color}
         fillOpacity={fillOpacity}
         stroke={color}
-        strokeWidth="2"
+        strokeWidth="2.5"
         strokeLinejoin="round"
       />
     </svg>
@@ -274,32 +275,6 @@ export default function ResultScreen({
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
   const isTopRank = result.grade === "S";
-
-  const getResultImageData = (): ResultImageData => {
-    const scores = [
-      { key: "selfCare" as const, name: "자기관리", score: result.categories.selfCare },
-      { key: "economy" as const, name: "경제력", score: result.categories.economy },
-      { key: "social" as const, name: "사회성", score: result.categories.social },
-      { key: "lifestyle" as const, name: "라이프스타일", score: result.categories.lifestyle },
-      { key: "mindset" as const, name: "마인드셋", score: result.categories.mindset },
-    ];
-    const maxScore = scores.reduce((max, item) => item.score > max.score ? item : max);
-    const minScore = scores.reduce((min, item) => item.score < min.score ? item : min);
-
-    return {
-      percentile: result.percentile,
-      grade: result.grade,
-      total: result.total,
-      gender: gender!,
-      gradeColor: grade.color,
-      typeName: userType.name,
-      typeRarity: userType.rarity,
-      rankings: detailedRankings,
-      categories: result.categories,
-      maxCategoryName: maxScore.name,
-      minCategoryName: minScore.name,
-    };
-  };
 
   // 유형명 생성
   const userType = generateTypeName(result.categories);
@@ -523,6 +498,19 @@ export default function ResultScreen({
     cat.score < min.score ? cat : min,
   );
 
+  const getResultImageData = (): ResultImageData => ({
+    percentile: result.percentile,
+    grade: result.grade,
+    total: result.total,
+    gender: gender!,
+    gradeColor: grade.color,
+    typeName: userType.name,
+    rankings: detailedRankings,
+    categories: result.categories,
+    maxCategoryName: maxCategory.name,
+    minCategoryName: minCategory.name,
+  });
+
   return (
     <div className="w-full min-h-screen overflow-y-auto relative">
       {/* Animated background for S grade */}
@@ -596,9 +584,6 @@ export default function ResultScreen({
           >
             <grade.icon className="w-5 h-5" strokeWidth={2} />
             <span>{userType.name}</span>
-            <span className="text-[14px] opacity-90">
-              (전체 {userType.rarity}%)
-            </span>
           </motion.div>
 
           {/* Percentile */}
@@ -750,7 +735,7 @@ export default function ResultScreen({
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.75 }}
-          className="rounded-[20px] p-3 mb-4 w-full max-w-[360px] mx-auto"
+          className="rounded-[20px] p-4 mb-4 w-full"
           style={{
             background: "var(--glass-bg)",
             border: `1px solid ${isTopRank ? grade.color + "40" : "var(--glass-border)"}`,
@@ -761,7 +746,7 @@ export default function ResultScreen({
             역량 분석
           </div>
 
-          <div className="flex justify-center">
+          <div className="mx-auto w-full max-w-[380px] aspect-square">
             <ResultRadarChart
               categories={result.categories}
               color={grade.color}
@@ -939,9 +924,9 @@ export default function ResultScreen({
         resultData={{
           percentile: result.percentile,
           grade: result.grade,
-          gender: gender,
+          gender: gender!,
           gradeConfig: grade,
-          userType: userType,
+          userType: userType.name,
           imageData: getResultImageData(),
         }}
       />

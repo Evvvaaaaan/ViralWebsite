@@ -105,8 +105,8 @@ export async function submitResult(data: {
     id: string;
     rankings: {
       national: number;
-      region: number;
-      ageGroup: number;
+      region: number | null;
+      ageGroup: number | null;
     };
   }>('/results', {
     method: 'POST',

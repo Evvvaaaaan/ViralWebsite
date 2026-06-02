@@ -18,10 +18,7 @@ interface ShareModalProps {
       label: string;
       icon: any;
     };
-    userType?: {
-      name: string;
-      rarity: number;
-    };
+    userType?: string;
     imageData: ResultImageData;
   };
 }
@@ -131,7 +128,7 @@ export default function ShareModal({ isOpen, onClose, resultData }: ShareModalPr
   const handleKakaoShare = async () => {
     logGAEvent('kakao_share_modal_clicked', 'engagement', 'Share Modal');
     logUserEvent('kakao_share_modal_clicked');
-    const text = `나는 전국 상위 ${resultData.percentile}%! 🏆\n${resultData.userType ? `유형: ${resultData.userType.name}` : ''}\n당신의 순위는?`;
+    const text = `나는 전국 상위 ${resultData.percentile}%! 🏆\n${resultData.userType ? `유형: ${resultData.userType}` : ''}\n당신의 순위는?`;
 
     if (navigator.share) {
       try {

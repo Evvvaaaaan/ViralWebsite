@@ -5,7 +5,6 @@ export interface ResultImageData {
   gender: "male" | "female";
   gradeColor: string;
   typeName: string;
-  typeRarity: number;
   rankings?: {
     national?: number;
     region?: number | null;
@@ -413,7 +412,7 @@ export async function createResultImageBlob(data: ResultImageData) {
   drawCenteredText(ctx, score, WIDTH / 2, 118, 64, data.gradeColor, 800);
   drawCenteredText(ctx, `의 ${genderLabel}입니다`, WIDTH / 2, 166, 25, "rgba(255,255,255,0.68)", 500);
 
-  const typeText = `${data.typeName} (전체 ${data.typeRarity}%)`;
+  const typeText = data.typeName;
   setFont(ctx, 25, 800);
   const typeWidth = Math.min(560, ctx.measureText(typeText).width + 56);
   fillRoundedRect(ctx, (WIDTH - typeWidth) / 2, 194, typeWidth, 60, 30, rgba(data.gradeColor, 0.14), data.gradeColor);
