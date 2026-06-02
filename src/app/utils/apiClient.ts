@@ -125,6 +125,26 @@ export async function fetchStats() {
 }
 
 /**
+ * 리더보드 조회 API
+ */
+export interface LeaderboardEntry {
+  rank: number;
+  name: string;
+  score: number;
+  gender: 'male' | 'female';
+}
+
+export interface LeaderboardResponse {
+  all: LeaderboardEntry[];
+  male: LeaderboardEntry[];
+  female: LeaderboardEntry[];
+}
+
+export async function fetchLeaderboard() {
+  return apiRequest<LeaderboardResponse>('/leaderboard');
+}
+
+/**
  * 목업 데이터 초기화 API
  */
 export async function initMockData() {

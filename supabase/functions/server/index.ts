@@ -160,6 +160,40 @@ function calculateRankings(userResult: any, allResults: any[]) {
   };
 }
 
+// 리더보드 순위 조회 (전체, 남성, 여성 상위 10명)
+app.get("/make-server-2ae6dc9b/leaderboard", async (c) => {
+  try {
+    const allResults = await kv.getByPrefix('result:');
+    const validResults = allResults.filter((r: any) => r && typeof r.total === 'number');
+
+    const mapAndSort = (results: any[]) => {
+      return results
+        .sort((a, b) => b.total - a.total)
+        .slice(0, 10)
+        .map((r, idx) => ({
+          rank: idx + 1,
+          name: '익명',
+          score: parseFloat(((r.total / 125) * 10).toFixed(2)),
+          gender: r.gender,
+        }));
+    };
+
+    const allRankings = mapAndSort(validResults);
+    const maleRankings = mapAndSort(validResults.filter((r: any) => r.gender === 'male'));
+    const femaleRankings = mapAndSort(validResults.filter((r: any) => r.gender === 'female'));
+
+    return c.json({
+      success: true,
+      all: allRankings,
+      male: maleRankings,
+      female: femaleRankings,
+    });
+  } catch (error) {
+    console.error('Error fetching leaderboard:', error);
+    return c.json({ error: String(error) }, 500);
+  }
+});
+
 // 통계 조회
 app.get("/make-server-2ae6dc9b/stats", async (c) => {
   try {

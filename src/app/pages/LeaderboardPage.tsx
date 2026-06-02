@@ -1,14 +1,14 @@
 import { Link } from 'react-router';
 import { motion } from 'motion/react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Trophy, Medal, Award, Home, BarChart3, Info, User, Users } from 'lucide-react';
+import { fetchLeaderboard } from '../utils/apiClient';
 import type React from 'react';
 
 export default function LeaderboardPage() {
   const [activeTab, setActiveTab] = useState<'all' | 'male' | 'female'>('all');
-
-  // Mock data - will be replaced with Supabase data
-  const leaderboardData = {
+  const [isLoading, setIsLoading] = useState(true);
+  const [leaderboards, setLeaderboards] = useState<any>({
     all: [
       { rank: 1, name: '익명', score: 9.87, gender: 'male' },
       { rank: 2, name: '익명', score: 9.45, gender: 'female' },
@@ -45,9 +45,34 @@ export default function LeaderboardPage() {
       { rank: 9, name: '익명', score: 6.65, gender: 'female' },
       { rank: 10, name: '익명', score: 6.32, gender: 'female' },
     ],
-  };
+  });
 
-  const currentData = leaderboardData[activeTab];
+  useEffect(() => {
+    let active = true;
+    async function loadLeaderboard() {
+      try {
+        const response = await fetchLeaderboard();
+        if (response.success && response.data && active) {
+          const { all, male, female } = response.data;
+          setLeaderboards({
+            all: all && all.length > 0 ? all : leaderboards.all,
+            male: male && male.length > 0 ? male : leaderboards.male,
+            female: female && female.length > 0 ? female : leaderboards.female,
+          });
+        }
+      } catch (err) {
+        console.error('Failed to load leaderboard:', err);
+      } finally {
+        if (active) setIsLoading(false);
+      }
+    }
+    loadLeaderboard();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const currentData = leaderboards[activeTab];
 
   return (
     <div className="min-h-screen bg-[#f7f7f7] flex flex-col md:flex-row">
@@ -90,9 +115,22 @@ export default function LeaderboardPage() {
       <div className="flex-1 overflow-auto">
         <div className="max-w-4xl mx-auto p-4 md:p-8">
           {/* Header */}
-          <div className="mb-6 md:mb-8">
-            <h1 className="text-[24px] md:text-[32px] font-bold text-gray-800 mb-2">전국 리더보드</h1>
-            <p className="text-[14px] md:text-[15px] text-gray-500">상위 10명의 점수를 확인하세요</p>
+          <div className="mb-6 md:mb-8 flex items-center justify-between">
+            <div>
+              <h1 className="text-[24px] md:text-[32px] font-bold text-gray-800 mb-2 flex items-center gap-3">
+                전국 리더보드
+                <span className="flex h-2.5 w-2.5 relative">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
+                </span>
+              </h1>
+              <p className="text-[14px] md:text-[15px] text-gray-500">실시간 데이터베이스 기반 상위 10명</p>
+            </div>
+            {isLoading && (
+              <span className="text-[12px] text-gray-400 bg-gray-100 px-3 py-1 rounded-full font-medium animate-pulse">
+                동기화 중...
+              </span>
+            )}
           </div>
 
           {/* Tabs */}
