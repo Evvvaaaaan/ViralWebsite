@@ -7,4 +7,4 @@ __figma__entrypoint__.ts
 .DS_Store
 supabase/.temp/
 .vercel/
-
+claude.md
