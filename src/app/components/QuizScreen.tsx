@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import type { Gender, QuizAnswer } from '../types';
 import { getQuestionOptions, getQuestionScore, getQuestionText, getQuestions, type Question } from '../data/questions';
 import { getCurrentOnlineUsers } from '../utils/engagement';
-import { Users } from 'lucide-react';
+import { Users, ChevronLeft } from 'lucide-react';
 import { logGAEvent } from '../utils/analytics';
 import { logUserEvent } from '../utils/apiClient';
 
@@ -120,6 +120,14 @@ export default function QuizScreen({ gender, ageGroup, onComplete, initialAnswer
     return (answeredInCategory / questionsInCategory) * 100;
   };
 
+  const handleGoBack = () => {
+    if (currentQuestion === 0 || selectedOption !== null || showSectionCard) return;
+    const prevQuestion = questionsList[currentQuestion - 1];
+    setAnswers(prev => prev.filter(a => a.questionId !== prevQuestion.id));
+    setDirection('backward');
+    setCurrentQuestion(prev => prev - 1);
+  };
+
   const handleAnswer = (optionIndex: number) => {
     if (selectedOption !== null) return;
 
@@ -187,6 +195,19 @@ export default function QuizScreen({ gender, ageGroup, onComplete, initialAnswer
         className="sticky top-0 px-6 pt-8 pb-6 z-10"
         style={{ background: bgColor }}
       >
+        {currentQuestion > 0 && !showSectionCard && (
+          <motion.button
+            initial={{ opacity: 0 }}
+            animate={{ opacity: selectedOption !== null ? 0 : 1 }}
+            onClick={handleGoBack}
+            disabled={selectedOption !== null}
+            className="mb-4 flex items-center gap-1 text-[13px] transition-opacity"
+            style={{ color: mutedColor }}
+          >
+            <ChevronLeft size={15} strokeWidth={2} />
+            이전 질문
+          </motion.button>
+        )}
         <div className="flex gap-1">
           {categories.map((cat, idx) => {
             const [start, end] = cat.range;
