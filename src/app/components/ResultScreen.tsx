@@ -32,13 +32,45 @@ import { createResultImageBlob, downloadImageBlob, isMobile, type ResultImageDat
 import InstagramIcon from "./InstagramIcon";
 import MobileSaveModal from "./MobileSaveModal";
 
-// 카테고리별 유형명 매핑
-const categoryTypes: Record<string, { adjective: string; noun: string }> = {
-  selfCare: { adjective: "건강한", noun: "관리자" },
-  economy: { adjective: "똑똑한", noun: "재테크형" },
-  social: { adjective: "따뜻한", noun: "소셜형" },
-  lifestyle: { adjective: "감각적인", noun: "라이프형" },
-  mindset: { adjective: "강인한", noun: "성장형" },
+type CategoryKey = 'selfCare' | 'economy' | 'social' | 'lifestyle' | 'mindset';
+
+// 25가지 유형명 (강점 × 약점 조합)
+const TYPE_MAP: Record<CategoryKey, Record<CategoryKey, { name: string; desc: string }>> = {
+  selfCare: {
+    selfCare:  { name: '균형 잡힌 자기관리러', desc: '자기관리가 가장 두드러진 균형형' },
+    economy:   { name: '건강한 방랑자',        desc: '외모와 체력은 최상위인데 통장이 텅 빈 유형' },
+    social:    { name: '고독한 자기관리러',     desc: '혼자는 완벽한데 관계가 어려운 유형' },
+    lifestyle: { name: '폼생폼사형',            desc: '겉은 완벽한데 생활 루틴이 무너진 유형' },
+    mindset:   { name: '관리형 쾌락주의자',     desc: '몸은 만들었는데 술·담배에 발목 잡히는 유형' },
+  },
+  economy: {
+    selfCare:  { name: '일하는 기계형',          desc: '커리어는 탄탄하지만 건강·외모 관리를 못 하는 유형' },
+    economy:   { name: '경제적 자립형',           desc: '경제력이 가장 두드러진 균형형' },
+    social:    { name: '혼자 잘나가는 유형',      desc: '혼자는 잘 나가지만 사람 관계가 약한 유형' },
+    lifestyle: { name: '성실한 워커홀릭',         desc: '일과 돈에는 강하지만 삶의 여유가 없는 유형' },
+    mindset:   { name: '냉철한 능력자',           desc: '성과는 뛰어나지만 생활 습관이 아쉬운 유형' },
+  },
+  social: {
+    selfCare:  { name: '인기는 있는데 관리 안 된 유형', desc: '사람들은 좋아하지만 자기관리가 부족한 유형' },
+    economy:   { name: '인싸이지만 빈털터리',     desc: '인기는 많은데 통장이 걱정인 유형' },
+    social:    { name: '사교적 매력형',            desc: '사회성이 가장 두드러진 균형형' },
+    lifestyle: { name: '사교적 번아웃형',          desc: '사람을 잘 사귀지만 혼자만의 시간이 없는 유형' },
+    mindset:   { name: '매력적인 문제아',          desc: '끌리는 매력은 있지만 생활 습관이 아쉬운 유형' },
+  },
+  lifestyle: {
+    selfCare:  { name: '자유로운 영혼형',          desc: '삶의 감각은 있는데 자기관리가 아쉬운 유형' },
+    economy:   { name: '행복하지만 가난한 유형',   desc: '삶의 질은 높은데 경제적 기반이 약한 유형' },
+    social:    { name: '혼자가 편한 라이프스타일러', desc: '자기 세계는 뚜렷한데 관계 형성이 어려운 유형' },
+    lifestyle: { name: '삶의 여유형',              desc: '라이프스타일이 가장 두드러진 균형형' },
+    mindset:   { name: '낭만적 즉흥주의자',        desc: '취미와 감성은 풍부한데 절제력이 약한 유형' },
+  },
+  mindset: {
+    selfCare:  { name: '내면의 성인',              desc: '인성과 가치관은 완벽한데 외모 관리가 약한 유형' },
+    economy:   { name: '착하지만 가난한 유형',     desc: '마음은 바른데 경제 감각이 부족한 유형' },
+    social:    { name: '조용한 모범생',             desc: '혼자는 완벽한데 사람 사귀는 게 어려운 유형' },
+    lifestyle: { name: '절제의 달인',              desc: '절제력은 뛰어나지만 삶이 단조로운 유형' },
+    mindset:   { name: '정신적 성숙형',            desc: '마인드셋이 가장 두드러진 균형형' },
+  },
 };
 
 // 표시용 퍼센타일 조정 (실제값 보존, 20% 이하는 그대로, 초과분은 20~30% 범위로 압축)
@@ -69,130 +101,182 @@ function level(score: number, key: string): number {
   return score / CATEGORY_MAX[key];
 }
 
-// 카테고리별 강점 메시지
-const STRENGTH_MSG: Record<string, (lv: number) => string> = {
-  selfCare: (lv) =>
-    lv >= 0.8
-      ? '자기관리 능력이 최상위권입니다. 규칙적인 루틴과 건강 관리가 습관으로 완전히 자리잡혀 있습니다.'
-      : '자기관리 루틴이 잘 갖춰져 있습니다. 꾸준한 생활 습관이 다른 영역의 기반이 됩니다.',
-  economy: (lv) =>
-    lv >= 0.8
-      ? '경제적 사고력과 재정 관리가 탁월합니다. 현명한 소비·저축·투자 습관을 모두 갖추고 있습니다.'
-      : '재정 감각이 좋습니다. 수입 대비 지출 균형을 잘 유지하고 있습니다.',
-  social: (lv) =>
-    lv >= 0.8
-      ? '대인관계와 소통 능력이 매우 뛰어납니다. 주변 사람들과의 신뢰 구축이 자연스럽게 이루어집니다.'
-      : '사회적 관계를 잘 유지합니다. 필요한 순간 도움을 주고받는 네트워크가 형성되어 있습니다.',
-  lifestyle: (lv) =>
-    lv >= 0.8
-      ? '삶의 방식이 균형 잡히고 풍요롭습니다. 여가·취미·건강이 조화롭게 설계되어 있습니다.'
-      : '라이프스타일에서 자신만의 루틴을 갖추고 있습니다.',
-  mindset: (lv) =>
-    lv >= 0.8
-      ? '성장 지향적 마인드와 회복 탄력성이 매우 강합니다. 어려운 상황도 성장의 기회로 전환합니다.'
-      : '긍정적 사고와 도전 의식이 있습니다. 목표를 향해 꾸준히 나아가는 힘이 있습니다.',
+// 티어 분류 (정규화 레벨 기준)
+type Tier = 'high' | 'mid' | 'low';
+function getTier(lv: number): Tier {
+  if (lv >= 0.72) return 'high';
+  if (lv >= 0.48) return 'mid';
+  return 'low';
+}
+
+// 카테고리별 티어 메시지 (강점 설명 / 개선 조언)
+const CATEGORY_FEEDBACK: Record<CategoryKey, Record<Tier, { title: string; message: string; action: string }>> = {
+  selfCare: {
+    high: {
+      title: '강점 ✦',
+      message: '자기관리 능력이 최상위권입니다. 규칙적인 루틴과 건강 관리가 완전히 습관화되어 있어요.',
+      action: '이 강점이 연애·커리어에서 실질적 경쟁력이 됩니다. 계속 유지하세요.',
+    },
+    mid: {
+      title: '보통',
+      message: '자기관리가 평균 수준입니다. 운동 빈도나 수면 관리 중 하나만 꾸준히 올려도 점수가 크게 오릅니다.',
+      action: '주 3회 운동 루틴을 먼저 잡아보세요.',
+    },
+    low: {
+      title: '개선 필요',
+      message: '자기관리 영역이 전체 순위에서 가장 많이 깎이는 구간입니다.',
+      action: '수면·식단·운동 중 하나부터 시작하세요. 주 1회부터도 충분합니다.',
+    },
+  },
+  economy: {
+    high: {
+      title: '강점 ✦',
+      message: '경제적 사고력과 재정 관리가 탁월합니다. 현명한 소비·저축·투자 습관을 모두 갖추고 있어요.',
+      action: '이 영역의 강점이 가장 오래 지속되는 실질적 매력입니다.',
+    },
+    mid: {
+      title: '보통',
+      message: '재정 감각이 평균 수준입니다. 저축·투자 비중을 조금만 높여도 순위가 빠르게 상승합니다.',
+      action: '월 소득의 10%부터 저축을 시작해보세요.',
+    },
+    low: {
+      title: '개선 필요',
+      message: '경제력이 전체 점수의 발목을 잡고 있습니다.',
+      action: '월 지출을 기록하는 것부터 시작하세요. 파악만으로도 점수가 눈에 띄게 오릅니다.',
+    },
+  },
+  social: {
+    high: {
+      title: '강점 ✦',
+      message: '대인관계와 소통 능력이 매우 뛰어납니다. 신뢰 구축이 자연스럽게 이루어지는 유형이에요.',
+      action: '이 강점은 연애·직장 모든 곳에서 실질적 경쟁력이 됩니다.',
+    },
+    mid: {
+      title: '보통',
+      message: '사회성이 평균 수준입니다. 먼저 연락하거나 안부를 묻는 작은 행동을 의식적으로 늘려보세요.',
+      action: '관계는 큰 이벤트보다 작은 꾸준함이 훨씬 효과적입니다.',
+    },
+    low: {
+      title: '개선 필요',
+      message: '사회성 영역에서 개선 여지가 가장 큽니다.',
+      action: '대화에서 상대방 말을 끝까지 듣는 것 하나만 의식해도 사회성 점수가 달라집니다.',
+    },
+  },
+  lifestyle: {
+    high: {
+      title: '강점 ✦',
+      message: '삶의 방식이 균형 잡히고 풍요롭습니다. 여가·취미·스마트폰 절제가 조화롭게 설계되어 있어요.',
+      action: '이 영역의 높은 점수는 매력적인 대화 주제와 자기 충족감을 동시에 만듭니다.',
+    },
+    mid: {
+      title: '보통',
+      message: '라이프스타일이 평균 수준입니다. 스마트폰 시간을 1시간 줄이고 취미에 투자해보세요.',
+      action: '삶의 여유가 생기면 대화도, 관계도 풍부해집니다.',
+    },
+    low: {
+      title: '개선 필요',
+      message: '라이프스타일 영역이 전체 점수에 영향을 주고 있습니다.',
+      action: '하루 스마트폰 사용 시간을 2시간 줄이는 것만으로도 전국 상위 35%로 진입 가능합니다.',
+    },
+  },
+  mindset: {
+    high: {
+      title: '강점 ✦',
+      message: '성장 지향적 마인드와 절제력이 매우 강합니다. 음주·흡연 등 생활 습관이 전국 기준 상위권이에요.',
+      action: '이 영역의 높은 점수는 건강·관계·인상 모두에 장기적으로 영향을 줍니다.',
+    },
+    mid: {
+      title: '보통',
+      message: '마인드셋이 평균 수준입니다. 음주 빈도나 온라인 시간 중 하나만 줄여도 점수가 오릅니다.',
+      action: '월 음주 횟수를 3회 이하로 줄이는 것이 가장 효과적입니다.',
+    },
+    low: {
+      title: '개선 필요',
+      message: '마인드셋 영역이 전체 순위를 가장 많이 깎고 있습니다.',
+      action: '음주·흡연 중 하나라도 개선하면 이 카테고리 점수가 크게 상승하고 전국 수만 명을 앞섭니다.',
+    },
+  },
 };
 
-// 카테고리별 개선 메시지
-const IMPROVE_MSG: Record<string, (lv: number) => string> = {
-  selfCare: (lv) =>
-    lv < 0.4
-      ? '수면·식단·운동 중 하나부터 시작해보세요. 작은 루틴 하나가 전체 순위를 크게 끌어올립니다.'
-      : '자기관리 루틴을 좀 더 체계화하면 상위권 진입이 가능합니다.',
-  economy: (lv) =>
-    lv < 0.4
-      ? '월 지출을 기록하는 것부터 시작하세요. 지출 파악만으로도 경제력 점수가 눈에 띄게 오릅니다.'
-      : '저축·투자 비중을 조금 높이면 경제력 순위가 빠르게 상승합니다.',
-  social: (lv) =>
-    lv < 0.4
-      ? '주변 관계를 넓히거나 유지하는 연습이 필요합니다. 작은 연락 하나가 네트워크를 만듭니다.'
-      : '대인관계의 깊이를 더하면 사회성 점수가 상위권으로 올라갑니다.',
-  lifestyle: (lv) =>
-    lv < 0.4
-      ? '주 1회 이상 자신을 위한 시간을 확보해보세요. 삶의 만족도가 전체 점수에 직결됩니다.'
-      : '라이프스타일의 다양성을 늘리면 점수 향상 여지가 있습니다.',
-  mindset: (lv) =>
-    lv < 0.4
-      ? '작은 성공 경험을 쌓는 것부터 시작하세요. 마인드셋은 가장 빠르게 개선 가능한 영역입니다.'
-      : '성장 마인드셋을 더 강화하면 장기적으로 가장 큰 순위 상승 효과를 냅니다.',
+// 강점+약점 조합별 전략
+const STRATEGY_MAP: Record<CategoryKey, Partial<Record<CategoryKey, string>>> = {
+  selfCare: {
+    economy:   '건강한 몸과 머리로 경제 공부에 집중하면 시너지 효과가 큽니다.',
+    social:    '좋은 컨디션에서 관계에 더 투자하면 금방 사회성도 올라갑니다.',
+    lifestyle: '자기관리 루틴에 여가를 접목하면 삶의 질이 한 단계 올라갑니다.',
+    mindset:   '이미 갖춰진 규칙적인 생활 습관으로 마인드셋 훈련을 더하면 최고 조합입니다.',
+  },
+  economy: {
+    selfCare:  '재정적 여유를 건강 투자로 연결하면 자기관리 점수도 빠르게 오릅니다.',
+    social:    '경제적 안정감을 바탕으로 관계에 더 투자할 여유를 만들어보세요.',
+    lifestyle: '재정 능력을 활용해 의미 있는 경험에 투자하면 큰 차이가 납니다.',
+    mindset:   '경제적 성공 경험이 마인드셋 강화에 가장 좋은 연료입니다.',
+  },
+  social: {
+    selfCare:  '넓은 인맥을 통해 좋은 건강 습관 정보를 적극 활용해보세요.',
+    economy:   '주변 네트워크를 경제 성장의 발판으로 활용하는 전략이 효과적입니다.',
+    lifestyle: '다양한 관계망을 통해 라이프스타일 영역도 함께 넓혀보세요.',
+    mindset:   '좋은 관계는 마인드셋 성장의 가장 강력한 동력입니다.',
+  },
+  lifestyle: {
+    selfCare:  '풍요로운 여가를 자기관리와 결합하면 두 영역 모두 올라갑니다.',
+    economy:   '라이프스타일에서 쌓은 경험을 경제적 가치로 연결해보세요.',
+    social:    '취미와 여가를 함께할 사람을 늘리면 사회성이 자연스럽게 따라옵니다.',
+    mindset:   '여유로운 삶의 방식이 마인드셋 성장에 좋은 토대가 됩니다.',
+  },
+  mindset: {
+    selfCare:  '강한 의지력을 생활 루틴 구축에 집중하면 가장 빠른 변화를 만듭니다.',
+    economy:   '도전 정신을 경제적 목표에 연결하면 재정 성장이 빨라집니다.',
+    social:    '성장 마인드로 관계에 접근하면 주변 사람들의 반응이 달라집니다.',
+    lifestyle: '마인드셋 힘으로 라이프스타일 변화에 도전해보세요.',
+  },
 };
 
-// 강점+약점 조합별 전략 메시지
-function generateStrategy(maxKey: string, minKey: string, minLv: number): string {
-  const strategies: Partial<Record<string, Partial<Record<string, string>>>> = {
-    selfCare: {
-      economy: '건강한 몸과 머리로 경제 공부에 집중하면 시너지 효과가 큽니다.',
-      social:  '좋은 컨디션에서 관계에 더 투자하면 금방 사회성도 올라갑니다.',
-      lifestyle: '자기관리 루틴에 여가를 접목하면 삶의 질이 한 단계 올라갑니다.',
-      mindset: '이미 갖춰진 규칙적인 생활 습관으로 마인드셋 훈련을 더하면 최고 조합입니다.',
-    },
-    economy: {
-      selfCare: '재정적 여유를 건강 투자로 연결하면 자기관리 점수도 빠르게 오릅니다.',
-      social:   '경제적 안정감을 바탕으로 관계에 더 투자할 여유를 만들어보세요.',
-      lifestyle: '재정 능력을 활용해 의미 있는 경험에 투자하면 큰 차이가 납니다.',
-      mindset:  '경제적 성공 경험이 마인드셋 강화에 가장 좋은 연료입니다.',
-    },
-    social: {
-      selfCare: '넓은 인맥을 통해 좋은 건강 습관 정보를 적극 활용해보세요.',
-      economy:  '주변 네트워크를 경제 성장의 발판으로 활용하는 전략이 효과적입니다.',
-      lifestyle: '다양한 관계망을 통해 라이프스타일 영역도 함께 넓혀보세요.',
-      mindset:  '좋은 관계는 마인드셋 성장의 가장 강력한 동력입니다.',
-    },
-    lifestyle: {
-      selfCare: '풍요로운 여가를 자기관리와 결합하면 두 영역 모두 올라갑니다.',
-      economy:  '라이프스타일에서 쌓은 경험을 경제적 가치로 연결해보세요.',
-      social:   '취미와 여가를 함께할 사람을 늘리면 사회성이 자연스럽게 따라옵니다.',
-      mindset:  '여유로운 삶의 방식이 마인드셋 성장에 좋은 토대가 됩니다.',
-    },
-    mindset: {
-      selfCare: '강한 의지력을 생활 루틴 구축에 집중하면 가장 빠른 변화를 만듭니다.',
-      economy:  '도전 정신을 경제적 목표에 연결하면 재정 성장이 빨라집니다.',
-      social:   '성장 마인드로 관계에 접근하면 주변 사람들의 반응이 달라집니다.',
-      lifestyle: '마인드셋 힘으로 라이프스타일 변화에 도전해보세요.',
-    },
-  };
+// 유형명 + 카테고리 피드백 + 전략 생성
+function generateUserProfile(categories: Record<string, number>) {
+  const keys = Object.keys(CATEGORY_MAX) as CategoryKey[];
+  const lvs = Object.fromEntries(keys.map((k) => [k, level(categories[k] ?? 0, k)]));
 
-  return strategies[maxKey]?.[minKey]
+  const maxKey = keys.reduce((a, b) => (lvs[a] >= lvs[b] ? a : b));
+  const minKey = keys.reduce((a, b) => (lvs[a] <= lvs[b] ? a : b));
+
+  const userType = TYPE_MAP[maxKey][minKey];
+  const strategy = STRATEGY_MAP[maxKey]?.[minKey]
     ?? `${CATEGORY_LABEL[maxKey]} 강점을 살려 ${CATEGORY_LABEL[minKey]} 영역에 집중 투자하면 순위가 크게 오릅니다.`;
+
+  const categoryCards = keys.map((k) => ({
+    key: k,
+    label: CATEGORY_LABEL[k],
+    lv: lvs[k],
+    tier: getTier(lvs[k]),
+    ...CATEGORY_FEEDBACK[k][getTier(lvs[k])],
+  }));
+
+  return { userType, maxKey, minKey, strategy, categoryCards };
 }
 
-function generateInsights(categories: Record<string, number>) {
-  const keys = Object.keys(CATEGORY_MAX);
-  const levels = Object.fromEntries(keys.map((k) => [k, level(categories[k] ?? 0, k)]));
+// 순위 상승 시뮬레이션 (약점 카테고리 1단계 개선 시)
+function simulateRankImprovement(
+  currentTotal: number,
+  minKey: CategoryKey,
+  mean: number,
+  stdDev: number
+): { improvedPct: number; rise: number } {
+  const improvement = CATEGORY_MAX[minKey] * 0.2; // 약점 카테고리 20% 향상 = 1단계
+  const newTotal = Math.min(currentTotal + improvement, 125);
 
-  const maxKey = keys.reduce((a, b) => (levels[a] >= levels[b] ? a : b));
-  const minKey = keys.reduce((a, b) => (levels[a] <= levels[b] ? a : b));
+  function normalCDF(z: number): number {
+    const t = 1 / (1 + 0.2316419 * Math.abs(z));
+    const d = 0.3989423 * Math.exp(-z * z / 2);
+    const p = d * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274))));
+    return z > 0 ? 1 - p : p;
+  }
 
-  return {
-    strength: STRENGTH_MSG[maxKey](levels[maxKey]),
-    improve:  IMPROVE_MSG[minKey](levels[minKey]),
-    strategy: generateStrategy(maxKey, minKey, levels[minKey]),
-    maxLabel: CATEGORY_LABEL[maxKey],
-    minLabel: CATEGORY_LABEL[minKey],
-  };
-}
+  const currentPct = (1 - normalCDF((currentTotal - mean) / stdDev)) * 100;
+  const improvedPct = (1 - normalCDF((newTotal - mean) / stdDev)) * 100;
+  const rise = Math.max(0.1, parseFloat((currentPct - improvedPct).toFixed(1)));
 
-// 유형명 생성 함수
-function generateTypeName(categories: Record<string, number>): {
-  name: string;
-  rarity: number;
-} {
-  const sorted = Object.entries(categories)
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, 2);
-
-  const [first, second] = sorted;
-  const firstType = categoryTypes[first[0]];
-  const secondType = categoryTypes[second[0]];
-
-  // 희귀도 계산 (두 카테고리의 평균 점수 기반)
-  const avgScore = (first[1] + second[1]) / 2;
-  const rarity = Math.max(0.1, Math.min(25, 26 - avgScore));
-
-  return {
-    name: `${firstType.adjective} ${secondType.noun}`,
-    rarity: parseFloat(rarity.toFixed(1)),
-  };
+  return { improvedPct: parseFloat(improvedPct.toFixed(1)), rise };
 }
 
 interface ResultScreenProps {
@@ -380,8 +464,17 @@ export default function ResultScreen({
 
   const isTopRank = result.grade === "S";
 
-  // 유형명 생성
-  const userType = generateTypeName(result.categories);
+  // 유형명 + 카테고리 피드백 생성
+  const profile = generateUserProfile(result.categories);
+  const { userType, categoryCards, strategy, minKey } = profile;
+
+  // 연령대별 정규분포 파라미터 (QuizFlow와 동일)
+  const ageGroup = result.ageGroup || '25~29세';
+  const meanMap: Record<string, number> = { '10대': 52, '20~24세': 60, '25~29세': 66, '30~39세': 72, '40세 이상': 75 };
+  const stdMap:  Record<string, number> = { '10대': 13, '20~24세': 15, '25~29세': 16, '30~39세': 17, '40세 이상': 16 };
+  const simMean = meanMap[ageGroup] ?? 66;
+  const simStd  = stdMap[ageGroup]  ?? 16;
+  const rankSim = simulateRankImprovement(result.total, minKey, simMean, simStd);
 
   // 세분화 순위 - 서버에서 받은 실제 순위 사용
   const detailedRankings = result.rankings || {
@@ -476,12 +569,12 @@ export default function ResultScreen({
   const handleKakaoShare = async () => {
     logGAEvent("kakao_share_clicked", "engagement", "Quick Actions");
     logUserEvent("kakao_share_clicked", { source: "result_page" });
-    const text = `나는 전국 상위 ${adjustedPercentile}%! ${userType.name} 유형\n당신의 순위는?`;
     const url = "https://lyralab.site/percentme";
+    const fullMessage = `${url}\n나는 전국 상위 ${adjustedPercentile}%! ${userType.name} 유형\n당신의 순위는?`;
 
     if (navigator.share) {
       try {
-        await navigator.share({ title: "전국 순위 테스트 결과", text, url });
+        await navigator.share({ title: "전국 순위 테스트 결과", text: fullMessage });
         return;
       } catch (err) {
         if ((err as Error).name === "AbortError") return;
@@ -489,12 +582,12 @@ export default function ResultScreen({
     }
 
     if (isMobile()) {
-      window.location.href = `kakaotalk://send?msg=${encodeURIComponent(`${text}\n${url}`)}`;
+      window.location.href = `kakaotalk://send?msg=${encodeURIComponent(fullMessage)}`;
       return;
     }
 
     try {
-      await navigator.clipboard.writeText(`${text}\n${url}`);
+      await navigator.clipboard.writeText(fullMessage);
       alert("링크가 복사되었습니다! 카카오톡에 붙여넣기하세요.");
     } catch (_) {}
   };
@@ -605,7 +698,6 @@ export default function ResultScreen({
     cat.score < min.score ? cat : min,
   );
 
-  const insights = generateInsights(result.categories);
 
   const getResultImageData = (): ResultImageData => ({
     percentile: result.percentile,
@@ -693,6 +785,16 @@ export default function ResultScreen({
           >
             <grade.icon className="w-5 h-5" strokeWidth={2} />
             <span>{userType.name}</span>
+          </motion.div>
+
+          {/* 유형 설명 */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.55 }}
+            className="text-[13px] text-white/50 mb-3 px-2"
+          >
+            {userType.desc}
           </motion.div>
 
           {/* Percentile */}
@@ -864,71 +966,99 @@ export default function ResultScreen({
           </div>
         </motion.div>
 
-        {/* Insights - Compact */}
+        {/* 카테고리별 상세 피드백 */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.82 }}
           className="space-y-2 mb-4"
         >
+          <div className="text-[11px] text-white/40 uppercase tracking-wider mb-2 text-center">
+            카테고리 분석
+          </div>
+          {categoryCards.map((card, i) => (
+            <div
+              key={card.key}
+              className="rounded-[14px] p-3"
+              style={{
+                background: card.tier === 'high'
+                  ? `${grade.color}12`
+                  : card.tier === 'low'
+                  ? 'rgba(255,107,107,0.08)'
+                  : 'var(--glass-bg)',
+                border: card.tier === 'high'
+                  ? `1px solid ${grade.color}30`
+                  : card.tier === 'low'
+                  ? '1px solid rgba(255,107,107,0.2)'
+                  : '1px solid var(--glass-border)',
+              }}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="text-[13px] font-semibold text-white">{card.label}</span>
+                    <span
+                      className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                      style={{
+                        background: card.tier === 'high' ? `${grade.color}30` : card.tier === 'low' ? 'rgba(255,107,107,0.2)' : 'rgba(255,255,255,0.1)',
+                        color: card.tier === 'high' ? grade.color : card.tier === 'low' ? '#ff6b6b' : 'rgba(255,255,255,0.5)',
+                      }}
+                    >
+                      {card.title}
+                    </span>
+                  </div>
+                  <div className="text-[12px] text-white/65 leading-relaxed">{card.message}</div>
+                  <div className="text-[11px] text-white/40 mt-1">{card.action}</div>
+                </div>
+                <div className="text-right flex-shrink-0">
+                  <div
+                    className="text-[15px] font-bold"
+                    style={{ color: card.tier === 'high' ? grade.color : card.tier === 'low' ? '#ff6b6b' : 'rgba(255,255,255,0.5)' }}
+                  >
+                    {Math.round(card.lv * 100)}%
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </motion.div>
+
+        {/* 전략 + 순위 시뮬레이션 */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.9 }}
+          className="space-y-2 mb-4"
+        >
           <div
             className="rounded-[14px] p-3"
-            style={{
-              background: "var(--glass-bg)",
-              border: "1px solid var(--glass-border)",
-            }}
+            style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)' }}
           >
             <div className="flex items-start gap-2">
-              <Gem
-                className="w-4 h-4 text-white/80 flex-shrink-0 mt-0.5"
-                strokeWidth={1.5}
-              />
+              <TrendingUp className="w-4 h-4 text-white/80 flex-shrink-0 mt-0.5" strokeWidth={1.5} />
               <div>
-                <div className="text-[13px] font-medium text-white">강점 — {insights.maxLabel}</div>
-                <div className="text-[12px] text-white/65">
-                  {insights.strength}
-                </div>
+                <div className="text-[13px] font-medium text-white mb-0.5">나만의 전략</div>
+                <div className="text-[12px] text-white/65">{strategy}</div>
               </div>
             </div>
           </div>
 
           <div
             className="rounded-[14px] p-3"
-            style={{
-              background: "var(--glass-bg)",
-              border: "1px solid var(--glass-border)",
-            }}
+            style={{ background: `${grade.color}10`, border: `1px solid ${grade.color}25` }}
           >
             <div className="flex items-start gap-2">
-              <Target
-                className="w-4 h-4 text-white/80 flex-shrink-0 mt-0.5"
-                strokeWidth={1.5}
-              />
+              <Target className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: grade.color }} strokeWidth={1.5} />
               <div>
-                <div className="text-[13px] font-medium text-white">개선 포인트 — {insights.minLabel}</div>
-                <div className="text-[12px] text-white/65">
-                  {insights.improve}
+                <div className="text-[13px] font-medium text-white mb-0.5">📈 순위 상승 시뮬레이션</div>
+                <div className="text-[12px] text-white/70">
+                  <span className="text-white/50">{CATEGORY_LABEL[minKey]}</span>을 1단계 개선하면
                 </div>
-              </div>
-            </div>
-          </div>
-
-          <div
-            className="rounded-[14px] p-3"
-            style={{
-              background: "var(--glass-bg)",
-              border: "1px solid var(--glass-border)",
-            }}
-          >
-            <div className="flex items-start gap-2">
-              <TrendingUp
-                className="w-4 h-4 text-white/80 flex-shrink-0 mt-0.5"
-                strokeWidth={1.5}
-              />
-              <div>
-                <div className="text-[13px] font-medium text-white">전략</div>
-                <div className="text-[12px] text-white/65">
-                  {insights.strategy}
+                <div className="text-[14px] font-bold mt-1" style={{ color: grade.color }}>
+                  상위 {adjustedPercentile}% → 상위 {adjustPercentile(rankSim.improvedPct)}%
+                  <span className="text-[12px] font-normal text-white/50 ml-2">
+                    ({rankSim.rise}% 상승)
+                  </span>
                 </div>
               </div>
             </div>
