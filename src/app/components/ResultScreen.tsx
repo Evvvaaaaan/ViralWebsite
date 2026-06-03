@@ -47,6 +47,131 @@ function adjustPercentile(actual: number): number {
   return parseFloat((20 + (actual - 20) * 0.2).toFixed(1));
 }
 
+// 카테고리별 실제 최대 점수
+const CATEGORY_MAX: Record<string, number> = {
+  selfCare: 50,
+  economy: 25,
+  social: 25,
+  lifestyle: 10,
+  mindset: 15,
+};
+
+const CATEGORY_LABEL: Record<string, string> = {
+  selfCare: '자기관리',
+  economy: '경제력',
+  social: '사회성',
+  lifestyle: '라이프스타일',
+  mindset: '마인드셋',
+};
+
+// 카테고리 점수 비율 → 수준 (0~1)
+function level(score: number, key: string): number {
+  return score / CATEGORY_MAX[key];
+}
+
+// 카테고리별 강점 메시지
+const STRENGTH_MSG: Record<string, (lv: number) => string> = {
+  selfCare: (lv) =>
+    lv >= 0.8
+      ? '자기관리 능력이 최상위권입니다. 규칙적인 루틴과 건강 관리가 습관으로 완전히 자리잡혀 있습니다.'
+      : '자기관리 루틴이 잘 갖춰져 있습니다. 꾸준한 생활 습관이 다른 영역의 기반이 됩니다.',
+  economy: (lv) =>
+    lv >= 0.8
+      ? '경제적 사고력과 재정 관리가 탁월합니다. 현명한 소비·저축·투자 습관을 모두 갖추고 있습니다.'
+      : '재정 감각이 좋습니다. 수입 대비 지출 균형을 잘 유지하고 있습니다.',
+  social: (lv) =>
+    lv >= 0.8
+      ? '대인관계와 소통 능력이 매우 뛰어납니다. 주변 사람들과의 신뢰 구축이 자연스럽게 이루어집니다.'
+      : '사회적 관계를 잘 유지합니다. 필요한 순간 도움을 주고받는 네트워크가 형성되어 있습니다.',
+  lifestyle: (lv) =>
+    lv >= 0.8
+      ? '삶의 방식이 균형 잡히고 풍요롭습니다. 여가·취미·건강이 조화롭게 설계되어 있습니다.'
+      : '라이프스타일에서 자신만의 루틴을 갖추고 있습니다.',
+  mindset: (lv) =>
+    lv >= 0.8
+      ? '성장 지향적 마인드와 회복 탄력성이 매우 강합니다. 어려운 상황도 성장의 기회로 전환합니다.'
+      : '긍정적 사고와 도전 의식이 있습니다. 목표를 향해 꾸준히 나아가는 힘이 있습니다.',
+};
+
+// 카테고리별 개선 메시지
+const IMPROVE_MSG: Record<string, (lv: number) => string> = {
+  selfCare: (lv) =>
+    lv < 0.4
+      ? '수면·식단·운동 중 하나부터 시작해보세요. 작은 루틴 하나가 전체 순위를 크게 끌어올립니다.'
+      : '자기관리 루틴을 좀 더 체계화하면 상위권 진입이 가능합니다.',
+  economy: (lv) =>
+    lv < 0.4
+      ? '월 지출을 기록하는 것부터 시작하세요. 지출 파악만으로도 경제력 점수가 눈에 띄게 오릅니다.'
+      : '저축·투자 비중을 조금 높이면 경제력 순위가 빠르게 상승합니다.',
+  social: (lv) =>
+    lv < 0.4
+      ? '주변 관계를 넓히거나 유지하는 연습이 필요합니다. 작은 연락 하나가 네트워크를 만듭니다.'
+      : '대인관계의 깊이를 더하면 사회성 점수가 상위권으로 올라갑니다.',
+  lifestyle: (lv) =>
+    lv < 0.4
+      ? '주 1회 이상 자신을 위한 시간을 확보해보세요. 삶의 만족도가 전체 점수에 직결됩니다.'
+      : '라이프스타일의 다양성을 늘리면 점수 향상 여지가 있습니다.',
+  mindset: (lv) =>
+    lv < 0.4
+      ? '작은 성공 경험을 쌓는 것부터 시작하세요. 마인드셋은 가장 빠르게 개선 가능한 영역입니다.'
+      : '성장 마인드셋을 더 강화하면 장기적으로 가장 큰 순위 상승 효과를 냅니다.',
+};
+
+// 강점+약점 조합별 전략 메시지
+function generateStrategy(maxKey: string, minKey: string, minLv: number): string {
+  const strategies: Partial<Record<string, Partial<Record<string, string>>>> = {
+    selfCare: {
+      economy: '건강한 몸과 머리로 경제 공부에 집중하면 시너지 효과가 큽니다.',
+      social:  '좋은 컨디션에서 관계에 더 투자하면 금방 사회성도 올라갑니다.',
+      lifestyle: '자기관리 루틴에 여가를 접목하면 삶의 질이 한 단계 올라갑니다.',
+      mindset: '이미 갖춰진 규칙적인 생활 습관으로 마인드셋 훈련을 더하면 최고 조합입니다.',
+    },
+    economy: {
+      selfCare: '재정적 여유를 건강 투자로 연결하면 자기관리 점수도 빠르게 오릅니다.',
+      social:   '경제적 안정감을 바탕으로 관계에 더 투자할 여유를 만들어보세요.',
+      lifestyle: '재정 능력을 활용해 의미 있는 경험에 투자하면 큰 차이가 납니다.',
+      mindset:  '경제적 성공 경험이 마인드셋 강화에 가장 좋은 연료입니다.',
+    },
+    social: {
+      selfCare: '넓은 인맥을 통해 좋은 건강 습관 정보를 적극 활용해보세요.',
+      economy:  '주변 네트워크를 경제 성장의 발판으로 활용하는 전략이 효과적입니다.',
+      lifestyle: '다양한 관계망을 통해 라이프스타일 영역도 함께 넓혀보세요.',
+      mindset:  '좋은 관계는 마인드셋 성장의 가장 강력한 동력입니다.',
+    },
+    lifestyle: {
+      selfCare: '풍요로운 여가를 자기관리와 결합하면 두 영역 모두 올라갑니다.',
+      economy:  '라이프스타일에서 쌓은 경험을 경제적 가치로 연결해보세요.',
+      social:   '취미와 여가를 함께할 사람을 늘리면 사회성이 자연스럽게 따라옵니다.',
+      mindset:  '여유로운 삶의 방식이 마인드셋 성장에 좋은 토대가 됩니다.',
+    },
+    mindset: {
+      selfCare: '강한 의지력을 생활 루틴 구축에 집중하면 가장 빠른 변화를 만듭니다.',
+      economy:  '도전 정신을 경제적 목표에 연결하면 재정 성장이 빨라집니다.',
+      social:   '성장 마인드로 관계에 접근하면 주변 사람들의 반응이 달라집니다.',
+      lifestyle: '마인드셋 힘으로 라이프스타일 변화에 도전해보세요.',
+    },
+  };
+
+  return strategies[maxKey]?.[minKey]
+    ?? `${CATEGORY_LABEL[maxKey]} 강점을 살려 ${CATEGORY_LABEL[minKey]} 영역에 집중 투자하면 순위가 크게 오릅니다.`;
+}
+
+function generateInsights(categories: Record<string, number>) {
+  const keys = Object.keys(CATEGORY_MAX);
+  const levels = Object.fromEntries(keys.map((k) => [k, level(categories[k] ?? 0, k)]));
+
+  const maxKey = keys.reduce((a, b) => (levels[a] >= levels[b] ? a : b));
+  const minKey = keys.reduce((a, b) => (levels[a] <= levels[b] ? a : b));
+
+  return {
+    strength: STRENGTH_MSG[maxKey](levels[maxKey]),
+    improve:  IMPROVE_MSG[minKey](levels[minKey]),
+    strategy: generateStrategy(maxKey, minKey, levels[minKey]),
+    maxLabel: CATEGORY_LABEL[maxKey],
+    minLabel: CATEGORY_LABEL[minKey],
+  };
+}
+
 // 유형명 생성 함수
 function generateTypeName(categories: Record<string, number>): {
   name: string;
@@ -480,6 +605,8 @@ export default function ResultScreen({
     cat.score < min.score ? cat : min,
   );
 
+  const insights = generateInsights(result.categories);
+
   const getResultImageData = (): ResultImageData => ({
     percentile: result.percentile,
     grade: result.grade,
@@ -757,9 +884,9 @@ export default function ResultScreen({
                 strokeWidth={1.5}
               />
               <div>
-                <div className="text-[13px] font-medium text-white">강점</div>
+                <div className="text-[13px] font-medium text-white">강점 — {insights.maxLabel}</div>
                 <div className="text-[12px] text-white/65">
-                  {maxCategory.name}가 전국 상위 수준입니다
+                  {insights.strength}
                 </div>
               </div>
             </div>
@@ -778,11 +905,9 @@ export default function ResultScreen({
                 strokeWidth={1.5}
               />
               <div>
-                <div className="text-[13px] font-medium text-white">
-                  개선 포인트
-                </div>
+                <div className="text-[13px] font-medium text-white">개선 포인트 — {insights.minLabel}</div>
                 <div className="text-[12px] text-white/65">
-                  {minCategory.name}을 1단계만 높이면 순위가 크게 오릅니다
+                  {insights.improve}
                 </div>
               </div>
             </div>
@@ -803,7 +928,7 @@ export default function ResultScreen({
               <div>
                 <div className="text-[13px] font-medium text-white">전략</div>
                 <div className="text-[12px] text-white/65">
-                  {maxCategory.name} 강점을 살려 {minCategory.name}을 보완하세요
+                  {insights.strategy}
                 </div>
               </div>
             </div>
