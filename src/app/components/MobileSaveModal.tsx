@@ -42,27 +42,46 @@ export default function MobileSaveModal({
               ? "인스타 스토리 공유하기"
               : "갤러리(사진첩)에 저장하기"}
           </h3>
-          <p className="text-[12px] text-white/60">
-            아래 이미지를 꾹 누르면 저장 메뉴가 나타납니다.
+          <p className="text-[12px] text-white/60 whitespace-pre-line">
+            {context === "instagram"
+              ? "이미지가 기기에 다운로드되었습니다.\n다운로드되지 않았다면 아래 이미지를 꾹 눌러 저장하세요!"
+              : "아래 이미지를 꾹 누르면 저장 메뉴가 나타납니다."}
           </p>
         </div>
 
-        <div className="relative w-full max-h-[55vh] rounded-2xl overflow-hidden border border-white/10 bg-black/40 shadow-inner flex items-center justify-center mb-4">
+        <div className="relative w-full max-h-[50vh] rounded-2xl overflow-hidden border border-white/10 bg-black/40 shadow-inner flex items-center justify-center mb-4">
           <img
             src={imageUrl}
             alt="결과 화면"
-            className="w-full h-auto max-h-[55vh] rounded-lg select-all object-contain"
+            className="w-full h-auto max-h-[50vh] rounded-lg select-all object-contain"
             style={{ WebkitTouchCallout: "default" }}
           />
         </div>
 
-        <div className="w-full text-center py-2 px-4 rounded-xl bg-white/5 border border-white/5 animate-pulse">
+        <div className="w-full text-center py-2 px-4 rounded-xl bg-white/5 border border-white/5 mb-4">
           <span className="text-[12px] text-red-400 font-semibold">
             {context === "instagram"
-              ? "💡 이미지를 3초간 길게 눌러 저장 후, 인스타 스토리에 업로드하세요!"
+              ? "💡 사진첩에 저장된 결과 이미지를 스토리에 업로드하세요!"
               : "💡 이미지를 3초간 길게 눌러 사진 앱에 추가하세요"}
           </span>
         </div>
+
+        {context === "instagram" && (
+          <button
+            onClick={() => {
+              window.location.href = "instagram://camera";
+              setTimeout(() => {
+                window.location.href = "instagram://";
+              }, 400);
+            }}
+            className="w-full py-4 rounded-2xl font-bold text-[15px] flex items-center justify-center gap-2 transition-all active:scale-[0.98] text-white shadow-lg"
+            style={{
+              background: "linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)",
+            }}
+          >
+            인스타그램 앱 열기
+          </button>
+        )}
       </motion.div>
     </div>
   );

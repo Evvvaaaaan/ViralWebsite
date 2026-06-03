@@ -5,6 +5,7 @@ import { logGAEvent } from '../utils/analytics';
 import { logUserEvent } from '../utils/apiClient';
 import { createResultImageBlob, downloadImageBlob, isMobile } from '../utils/resultImage';
 import type { ResultImageData } from '../utils/resultImage';
+import { shareToKakao } from '../utils/kakao';
 import InstagramIcon from './InstagramIcon';
 import MobileSaveModal from './MobileSaveModal';
 
@@ -80,25 +81,20 @@ export default function ShareModal({ isOpen, onClose, resultData }: ShareModalPr
     }
     if (!blob) return;
 
-    const file = new File([blob], 'quiz-result.png', { type: 'image/png' });
+    const fileName = `순위테스트-결과-상위${resultData.percentile}%.png`;
 
-    if (isMobile() && navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-      try {
-        await navigator.share({
-          files: [file],
-          title: '전국 순위 테스트 결과',
-        });
-        return;
-      } catch (err) {
-        if ((err as Error).name === 'AbortError') return; // User cancelled
-        console.warn('Instagram share failed, fallback to modal:', err);
-      }
+    if (isMobile()) {
+      // 1. Auto-download to the gallery/files first
+      downloadImageBlob(blob, fileName);
+
+      // 2. Open the mobile save modal with Instagram context
+      const url = URL.createObjectURL(blob);
+      setMobileSaveImage(url);
+      setMobileSaveContext('instagram');
+    } else {
+      downloadImageBlob(blob, fileName);
+      alert('결과 이미지가 다운로드되었습니다. 인스타그램에 업로드해보세요!');
     }
-
-    // Fallback to long-press modal with Instagram context
-    const url = URL.createObjectURL(blob);
-    setMobileSaveImage(url);
-    setMobileSaveContext('instagram');
   };
 
   /**
@@ -109,20 +105,24 @@ export default function ShareModal({ isOpen, onClose, resultData }: ShareModalPr
     logUserEvent('kakao_share_modal_clicked');
     const text = `나는 전국 상위 ${resultData.percentile}%! 🏆\n${resultData.userType ? `유형: ${resultData.userType}` : ''}\n당신의 순위는?`;
 
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: '전국 순위 테스트 결과', text, url: shareUrl });
-        return;
-      } catch (err) {
-        if ((err as Error).name === 'AbortError') return;
-      }
+    // 1. Try sharing via the official Kakao SDK share first
+    const isShared = shareToKakao({
+      percentile: resultData.percentile,
+      userType: resultData.userType || '',
+      grade: resultData.gradeConfig.label,
+    });
+
+    if (isShared) {
+      return;
     }
 
+    // 2. Direct app deep-link fallback for mobile (bypasses system share sheet to open KakaoTalk directly)
     if (isMobile()) {
       window.location.href = `kakaotalk://send?msg=${encodeURIComponent(`${text}\n${shareUrl}`)}`;
       return;
     }
 
+    // 3. Desktop clipboard fallback
     try {
       await navigator.clipboard.writeText(`${text}\n${shareUrl}`);
       alert('링크가 복사되었습니다! 카카오톡에 붙여넣기하세요.');
@@ -177,20 +177,17 @@ export default function ShareModal({ isOpen, onClose, resultData }: ShareModalPr
     }
     if (!blob) return;
 
+    const fileName = `순위테스트-결과-상위${resultData.percentile}%-${Date.now()}.png`;
+
     if (isMobile()) {
-      const file = new File([blob], `순위테스트-결과-상위${resultData.percentile}%.png`, { type: 'image/png' });
-      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-        try {
-          await navigator.share({ files: [file], title: '전국 순위 테스트 결과' });
-          return;
-        } catch (err) {
-          if ((err as Error).name === 'AbortError') return;
-        }
-      }
-      setMobileSaveImage(URL.createObjectURL(blob));
+      // 1. Save directly (Android Chrome saves to Gallery/Downloads; iOS Safari downloads to Files)
+      downloadImageBlob(blob, fileName);
+
+      // 2. Open the mobile save modal as instructions/fallback for iOS gallery long-press saving
+      const url = URL.createObjectURL(blob);
+      setMobileSaveImage(url);
       setMobileSaveContext('save');
     } else {
-      const fileName = `순위테스트-결과-상위${resultData.percentile}%-${Date.now()}.png`;
       downloadImageBlob(blob, fileName);
     }
   };

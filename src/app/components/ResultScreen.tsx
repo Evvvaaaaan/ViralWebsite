@@ -29,6 +29,7 @@ import { Link } from "react-router";
 import { logGAEvent } from "../utils/analytics";
 import { logUserEvent } from "../utils/apiClient";
 import { createResultImageBlob, downloadImageBlob, isMobile, type ResultImageData } from "../utils/resultImage";
+import { shareToKakao } from "../utils/kakao";
 import InstagramIcon from "./InstagramIcon";
 import MobileSaveModal from "./MobileSaveModal";
 
@@ -533,31 +534,20 @@ export default function ResultScreen({
       const blob = await createResultImageBlob(getResultImageData());
       setIsCapturing(false);
 
-      if (blob) {
-        const file = new File([blob], "quiz-result.png", { type: "image/png" });
-        if (
-          isMobile() &&
-          navigator.share &&
-          navigator.canShare &&
-          navigator.canShare({ files: [file] })
-        ) {
-          try {
-            await navigator.share({
-              files: [file],
-              title: "전국 순위 테스트 결과",
-            });
-            return;
-          } catch (shareErr) {
-            if ((shareErr as Error).name === "AbortError") return; // User cancelled
-            console.warn(
-              "Instagram share failed, fallback to modal:",
-              shareErr,
-            );
-          }
-        }
+      if (!blob) return;
 
+      const fileName = `순위테스트-결과-상위${adjustedPercentile}%.png`;
+
+      if (isMobile()) {
+        // 1. Auto-download to the gallery/files first
+        downloadImageBlob(blob, fileName);
+
+        // 2. Open the mobile save modal with Instagram context
         setMobileSaveImage(URL.createObjectURL(blob));
         setMobileSaveContext("instagram");
+      } else {
+        downloadImageBlob(blob, fileName);
+        alert("결과 이미지가 다운로드되었습니다. 인스타그램에 업로드해보세요!");
       }
     } catch (err) {
       setIsCapturing(false);
@@ -572,20 +562,24 @@ export default function ResultScreen({
     const url = "https://lyralab.site/percentme";
     const fullMessage = `${url}\n나는 전국 상위 ${adjustedPercentile}%! ${userType.name} 유형\n당신의 순위는?`;
 
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: "전국 순위 테스트 결과", text: fullMessage });
-        return;
-      } catch (err) {
-        if ((err as Error).name === "AbortError") return;
-      }
+    // 1. Try sharing via the official Kakao SDK share first
+    const isShared = shareToKakao({
+      percentile: adjustedPercentile,
+      userType: userType.name,
+      grade: gradeConfig.label,
+    });
+
+    if (isShared) {
+      return;
     }
 
+    // 2. Direct app deep-link fallback for mobile (bypasses system share sheet to open KakaoTalk directly)
     if (isMobile()) {
       window.location.href = `kakaotalk://send?msg=${encodeURIComponent(fullMessage)}`;
       return;
     }
 
+    // 3. Desktop clipboard fallback
     try {
       await navigator.clipboard.writeText(fullMessage);
       alert("링크가 복사되었습니다! 카카오톡에 붙여넣기하세요.");
@@ -603,24 +597,16 @@ export default function ResultScreen({
 
       if (!blob) return;
 
+      const fileName = `순위테스트-결과-상위${adjustedPercentile}%-${Date.now()}.png`;
+
       if (isMobile()) {
-        const file = new File([blob], `순위테스트-결과-상위${adjustedPercentile}%.png`, { type: "image/png" });
-        if (
-          navigator.share &&
-          navigator.canShare &&
-          navigator.canShare({ files: [file] })
-        ) {
-          try {
-            await navigator.share({ files: [file], title: "전국 순위 테스트 결과" });
-            return;
-          } catch (shareErr) {
-            if ((shareErr as Error).name === "AbortError") return;
-          }
-        }
+        // 1. Save directly (Android Chrome saves to Gallery/Downloads; iOS Safari downloads to Files)
+        downloadImageBlob(blob, fileName);
+
+        // 2. Open the mobile save modal as instructions/fallback for iOS gallery long-press saving
         setMobileSaveImage(URL.createObjectURL(blob));
         setMobileSaveContext("save");
       } else {
-        const fileName = `순위테스트-결과-상위${adjustedPercentile}%-${Date.now()}.png`;
         downloadImageBlob(blob, fileName);
       }
     } catch (err) {
@@ -1128,6 +1114,24 @@ export default function ResultScreen({
             )}
             <span>결과 이미지 저장</span>
           </motion.button>
+
+          {/* 내가 전국에서 몇등인지 확인해보세요! */}
+          <Link to="/leaderboard" className="block w-full">
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              onClick={() => {
+                logGAEvent("check_leaderboard_clicked", "engagement", "Quick Actions");
+                logUserEvent("check_leaderboard_clicked", { source: "result_page" });
+              }}
+              className="w-full py-4 rounded-2xl font-bold text-[16px] flex items-center justify-center gap-2 text-white transition-all duration-300 active:scale-[0.98]"
+              style={{
+                background: "linear-gradient(90deg, #8A2387 0%, #E94057 50%, #F27121 100%)",
+                boxShadow: "0 4px 15px rgba(233, 64, 87, 0.4)",
+              }}
+            >
+              <span>🏆 내가 전국에서 몇등인지 확인해보세요!</span>
+            </motion.button>
+          </Link>
 
           {/* 더 많은 공유 옵션 */}
           <button
