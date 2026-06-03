@@ -404,6 +404,15 @@ export function downloadImageBlob(blob: Blob, fileName: string): void {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+export function blobToDataURL(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
 export async function createResultImageBlob(data: ResultImageData) {
   const canvas = document.createElement("canvas");
   canvas.width = WIDTH * SCALE;

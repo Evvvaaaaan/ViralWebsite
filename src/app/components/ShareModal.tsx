@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { X, Download, Link as LinkIcon, Check, MessageCircle, Loader2 } from 'lucide-react';
 import { logGAEvent } from '../utils/analytics';
 import { logUserEvent } from '../utils/apiClient';
-import { createResultImageBlob, downloadImageBlob, isMobile } from '../utils/resultImage';
+import { createResultImageBlob, downloadImageBlob, isMobile, blobToDataURL } from '../utils/resultImage';
 import type { ResultImageData } from '../utils/resultImage';
 import { shareToKakao } from '../utils/kakao';
 import InstagramIcon from './InstagramIcon';
@@ -82,12 +82,24 @@ export default function ShareModal({ isOpen, onClose, resultData }: ShareModalPr
     if (!blob) return;
 
     const fileName = `순위테스트-결과-상위${resultData.percentile}%.png`;
+    // Using a clean alphanumeric filename prevents broken preview thumbnails and file loading errors on mobile OS share sheets (e.g. iOS Safari)
+    const file = new File([blob], 'quiz-result.png', { type: 'image/png' });
+
+    if (isMobile() && navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({
+          files: [file],
+          title: '전국 순위 테스트 결과',
+        });
+        return;
+      } catch (err) {
+        if ((err as Error).name === 'AbortError') return; // User cancelled
+        console.warn('Instagram share failed, fallback to modal:', err);
+      }
+    }
 
     if (isMobile()) {
-      // 1. Auto-download to the gallery/files first
-      downloadImageBlob(blob, fileName);
-
-      // 2. Open the mobile save modal with Instagram context
+      // Reverted: Do NOT call downloadImageBlob on mobile to avoid web downloads. Use URL.createObjectURL for preview.
       const url = URL.createObjectURL(blob);
       setMobileSaveImage(url);
       setMobileSaveContext('instagram');
@@ -104,29 +116,28 @@ export default function ShareModal({ isOpen, onClose, resultData }: ShareModalPr
     logGAEvent('kakao_share_modal_clicked', 'engagement', 'Share Modal');
     logUserEvent('kakao_share_modal_clicked');
     const text = `나는 전국 상위 ${resultData.percentile}%! 🏆\n${resultData.userType ? `유형: ${resultData.userType}` : ''}\n당신의 순위는?`;
+    const fullMessage = `${text}\n${shareUrl}`;
 
-    // 1. Try sharing via the official Kakao SDK share first
-    const isShared = shareToKakao({
-      percentile: resultData.percentile,
-      userType: resultData.userType || '',
-      grade: resultData.gradeConfig.label,
-    });
-
-    if (isShared) {
-      return;
-    }
-
-    // 2. Direct app deep-link fallback for mobile (bypasses system share sheet to open KakaoTalk directly)
-    if (isMobile()) {
-      window.location.href = `kakaotalk://send?msg=${encodeURIComponent(`${text}\n${shareUrl}`)}`;
-      return;
-    }
-
-    // 3. Desktop clipboard fallback
+    // 1. Copy the text/link to clipboard
     try {
-      await navigator.clipboard.writeText(`${text}\n${shareUrl}`);
+      await navigator.clipboard.writeText(fullMessage);
+    } catch (_) {
+      const textarea = document.createElement('textarea');
+      textarea.value = fullMessage;
+      textarea.style.position = 'fixed';
+      textarea.style.left = '-9999px';
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+    }
+
+    // 2. Redirect to KakaoTalk app on mobile
+    if (isMobile()) {
+      window.location.href = 'kakaotalk://';
+    } else {
       alert('링크가 복사되었습니다! 카카오톡에 붙여넣기하세요.');
-    } catch (_) {}
+    }
   };
 
   /**
@@ -178,12 +189,20 @@ export default function ShareModal({ isOpen, onClose, resultData }: ShareModalPr
     if (!blob) return;
 
     const fileName = `순위테스트-결과-상위${resultData.percentile}%-${Date.now()}.png`;
+    // Using a clean alphanumeric filename prevents broken preview thumbnails and file loading errors on mobile OS share sheets (e.g. iOS Safari)
+    const file = new File([blob], 'quiz-result.png', { type: 'image/png' });
+
+    if (isMobile() && navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: '전국 순위 테스트 결과' });
+        return;
+      } catch (err) {
+        if ((err as Error).name === 'AbortError') return;
+      }
+    }
 
     if (isMobile()) {
-      // 1. Save directly (Android Chrome saves to Gallery/Downloads; iOS Safari downloads to Files)
-      downloadImageBlob(blob, fileName);
-
-      // 2. Open the mobile save modal as instructions/fallback for iOS gallery long-press saving
+      // Reverted: Do NOT call downloadImageBlob on mobile to avoid web downloads. Use URL.createObjectURL for preview.
       const url = URL.createObjectURL(blob);
       setMobileSaveImage(url);
       setMobileSaveContext('save');
