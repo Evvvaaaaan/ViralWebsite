@@ -160,13 +160,8 @@ export default function QuizScreen({
 
     // Social feedback after 350ms
     setTimeout(() => {
-      const percentage = Math.floor(Math.random() * 40) + 30;
-      const isPopular = percentage > 50;
-      setSocialFeedback(
-        isPopular
-          ? `↑ 응답자 ${percentage}%도 같은 선택`
-          : `↓ 상위 ${100 - percentage}%만 이 답 선택`,
-      );
+      const percentage = Math.floor(Math.random() * 11) + 20; // 20~30%
+      setSocialFeedback(`↑ 응답자 ${percentage}% 사이로 사용자가 선택하였어요`);
     }, 350);
 
     // Auto-advance after 1000ms (Increased to give more reading time)
