@@ -41,6 +41,12 @@ const categoryTypes: Record<string, { adjective: string; noun: string }> = {
   mindset: { adjective: "강인한", noun: "성장형" },
 };
 
+// 표시용 퍼센타일 조정 (실제값 보존, 20% 이하는 그대로, 초과분은 20~30% 범위로 압축)
+function adjustPercentile(actual: number): number {
+  if (actual <= 20) return actual;
+  return parseFloat((20 + (actual - 20) * 0.2).toFixed(1));
+}
+
 // 유형명 생성 함수
 function generateTypeName(categories: Record<string, number>): {
   name: string;
@@ -229,7 +235,8 @@ export default function ResultScreen({
   const [displayPercentile, setDisplayPercentile] = useState(0);
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [showRankChange, setShowRankChange] = useState(false);
-  const [newPercentile, setNewPercentile] = useState(result.percentile);
+  const adjustedPercentile = adjustPercentile(result.percentile);
+  const [newPercentile, setNewPercentile] = useState(adjustedPercentile);
   const [isCapturing, setIsCapturing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [mobileSaveImage, setMobileSaveImage] = useState<string | null>(null);
@@ -281,7 +288,7 @@ export default function ResultScreen({
       // 보고서 명세: 순위 소폭 하락 (0.05 ~ 0.15% 증가)
       const increase = (Math.random() * 0.1 + 0.05).toFixed(2);
       const updated = parseFloat(
-        (result.percentile + parseFloat(increase)).toFixed(2),
+        (adjustedPercentile + parseFloat(increase)).toFixed(2),
       );
       setNewPercentile(updated);
       setShowRankChange(true);
@@ -344,7 +351,7 @@ export default function ResultScreen({
   const handleKakaoShare = async () => {
     logGAEvent("kakao_share_clicked", "engagement", "Quick Actions");
     logUserEvent("kakao_share_clicked", { source: "result_page" });
-    const text = `나는 전국 상위 ${result.percentile}%! ${userType.name} 유형\n당신의 순위는?`;
+    const text = `나는 전국 상위 ${adjustedPercentile}%! ${userType.name} 유형\n당신의 순위는?`;
     const url = "https://lyralab.site/percentme";
 
     if (navigator.share) {
@@ -379,7 +386,7 @@ export default function ResultScreen({
       if (!blob) return;
 
       if (isMobile()) {
-        const file = new File([blob], `순위테스트-결과-상위${result.percentile}%.png`, { type: "image/png" });
+        const file = new File([blob], `순위테스트-결과-상위${adjustedPercentile}%.png`, { type: "image/png" });
         if (
           navigator.share &&
           navigator.canShare &&
@@ -395,7 +402,7 @@ export default function ResultScreen({
         setMobileSaveImage(URL.createObjectURL(blob));
         setMobileSaveContext("save");
       } else {
-        const fileName = `순위테스트-결과-상위${result.percentile}%-${Date.now()}.png`;
+        const fileName = `순위테스트-결과-상위${adjustedPercentile}%-${Date.now()}.png`;
         downloadImageBlob(blob, fileName);
       }
     } catch (err) {
@@ -441,7 +448,7 @@ export default function ResultScreen({
   // Count up animation with overshoot
   useEffect(() => {
     let start = 0;
-    const end = result.percentile;
+    const end = adjustedPercentile;
     const duration = isTopRank ? 1500 : 1200;
     const increment = end / (duration / 16);
 
@@ -570,7 +577,7 @@ export default function ResultScreen({
           >
             전국 기준{" "}
             <strong style={{ color: grade.color }}>
-              상위 {result.percentile}%
+              상위 {adjustedPercentile}%
             </strong>
           </motion.div>
         </motion.div>
@@ -596,7 +603,7 @@ export default function ResultScreen({
               // 배열 인덱스는 0부터 시작하므로 인덱스 7
               const userPosition = Math.max(
                 0,
-                Math.min(99, Math.floor(result.percentile) - 1),
+                Math.min(99, Math.floor(adjustedPercentile) - 1),
               );
               const isUser = i === userPosition;
               return (
@@ -627,8 +634,8 @@ export default function ResultScreen({
             })}
           </div>
           <div className="text-[12px] text-white/60 text-center mt-3">
-            밝게 표시된 사람이 당신입니다 (상위 {result.percentile}%: 100명 중{" "}
-            {Math.floor(result.percentile)}번째)
+            밝게 표시된 사람이 당신입니다 (상위 {adjustedPercentile}%: 100명 중{" "}
+            {Math.floor(adjustedPercentile)}번째)
           </div>
         </motion.div>
 
@@ -897,7 +904,7 @@ export default function ResultScreen({
         isOpen={shareModalOpen}
         onClose={() => setShareModalOpen(false)}
         resultData={{
-          percentile: result.percentile,
+          percentile: adjustedPercentile,
           grade: result.grade,
           gender: gender!,
           gradeConfig: grade,
@@ -936,7 +943,7 @@ export default function ResultScreen({
               <div className="text-[14px] text-white/80 mb-1">
                 상위{" "}
                 <span className="text-red-400 font-semibold">
-                  {result.percentile}%
+                  {adjustedPercentile}%
                 </span>
                 {" → "}
                 <span className="text-red-400 font-semibold">
