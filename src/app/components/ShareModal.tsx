@@ -5,7 +5,6 @@ import { logGAEvent } from '../utils/analytics';
 import { logUserEvent } from '../utils/apiClient';
 import { createResultImageBlob, downloadImageBlob, isMobile, blobToDataURL } from '../utils/resultImage';
 import type { ResultImageData } from '../utils/resultImage';
-import { shareToKakao } from '../utils/kakao';
 import InstagramIcon from './InstagramIcon';
 import MobileSaveModal from './MobileSaveModal';
 
@@ -116,28 +115,25 @@ export default function ShareModal({ isOpen, onClose, resultData }: ShareModalPr
     logGAEvent('kakao_share_modal_clicked', 'engagement', 'Share Modal');
     logUserEvent('kakao_share_modal_clicked');
     const text = `나는 전국 상위 ${resultData.percentile}%! 🏆\n${resultData.userType ? `유형: ${resultData.userType}` : ''}\n당신의 순위는?`;
-    const fullMessage = `${text}\n${shareUrl}`;
 
-    // 1. Copy the text/link to clipboard
-    try {
-      await navigator.clipboard.writeText(fullMessage);
-    } catch (_) {
-      const textarea = document.createElement('textarea');
-      textarea.value = fullMessage;
-      textarea.style.position = 'fixed';
-      textarea.style.left = '-9999px';
-      document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textarea);
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: '전국 순위 테스트 결과', text, url: shareUrl });
+        return;
+      } catch (err) {
+        if ((err as Error).name === 'AbortError') return;
+      }
     }
 
-    // 2. Redirect to KakaoTalk app on mobile
     if (isMobile()) {
-      window.location.href = 'kakaotalk://';
-    } else {
-      alert('링크가 복사되었습니다! 카카오톡에 붙여넣기하세요.');
+      window.location.href = `kakaotalk://send?msg=${encodeURIComponent(`${text}\n${shareUrl}`)}`;
+      return;
     }
+
+    try {
+      await navigator.clipboard.writeText(`${text}\n${shareUrl}`);
+      alert('링크가 복사되었습니다! 카카오톡에 붙여넣기하세요.');
+    } catch (_) {}
   };
 
   /**
