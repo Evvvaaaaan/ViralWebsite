@@ -29,6 +29,19 @@ const categories = [
   { name: "라이프스타일", range: [21, 25] },
 ];
 
+const feedbackPercentageRanges: Record<number, [number, number]> = {
+  1: [6, 13],
+  2: [14, 22],
+  3: [28, 38],
+  4: [19, 29],
+  5: [8, 15],
+};
+
+const getFeedbackPercentage = (score: number) => {
+  const [min, max] = feedbackPercentageRanges[score] ?? [20, 30];
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+};
+
 export default function QuizScreen({
   gender,
   ageGroup,
@@ -160,8 +173,9 @@ export default function QuizScreen({
 
     // Social feedback after 350ms
     setTimeout(() => {
-      const percentage = Math.floor(Math.random() * 11) + 20; // 20~30%
-      setSocialFeedback(`↑ 응답자 ${percentage}% 사이로 사용자가 선택하였어요`);
+      const score = getQuestionScore(question, optionIndex, gender);
+      const percentage = getFeedbackPercentage(score);
+      setSocialFeedback(`응답자 중 ${percentage}%가 같은 선택을 했어요`);
     }, 350);
 
     // Auto-advance after 1000ms (Increased to give more reading time)

@@ -150,11 +150,11 @@ const TYPE_MAP: Record<
 
 // 카테고리별 실제 최대 점수
 const CATEGORY_MAX: Record<string, number> = {
-  selfCare: 50,
+  selfCare: 25,
   economy: 25,
   social: 25,
-  lifestyle: 10,
-  mindset: 15,
+  lifestyle: 25,
+  mindset: 25,
 };
 
 const CATEGORY_LABEL: Record<string, string> = {

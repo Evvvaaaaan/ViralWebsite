@@ -147,30 +147,73 @@ app.post("/make-server-2ae6dc9b/results", async (c) => {
   return c.json({ success: true, id, rankings });
 });
 
+function normalCDF(x: number, mean: number, stdDev: number): number {
+  const z = (x - mean) / stdDev;
+  const t = 1 / (1 + 0.2316419 * Math.abs(z));
+  const d = 0.3989423 * Math.exp(-z * z / 2);
+  const p = d * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274))));
+  let cdf = 1 - p;
+  if (z < 0) cdf = p;
+  return cdf;
+}
+
+function getAgeDistribution(ageGroup: string | null) {
+  if (ageGroup === '10대') return { mean: 52, stdDev: 13 };
+  if (ageGroup === '20~24세') return { mean: 60, stdDev: 15 };
+  if (ageGroup === '25~29세') return { mean: 66, stdDev: 16 };
+  if (ageGroup === '30~39세') return { mean: 72, stdDev: 17 };
+  if (ageGroup === '40세 이상') return { mean: 75, stdDev: 16 };
+  return { mean: 66, stdDev: 16 };
+}
+
+function modelPercentile(total: number, ageGroup: string | null): number {
+  const { mean, stdDev } = getAgeDistribution(ageGroup);
+  const cdfVal = normalCDF(total, mean, stdDev);
+  return Math.max(0.1, Math.min(99.9, parseFloat(((1 - cdfVal) * 100).toFixed(1))));
+}
+
+function empiricalPercentile(total: number, results: any[]): number | null {
+  if (results.length === 0) return null;
+  const betterCount = results.filter((r: any) => r.total > total).length;
+  return Math.max(0.1, parseFloat(((betterCount / results.length) * 100).toFixed(1)));
+}
+
+function stabilizePercentile(empirical: number | null, model: number, sampleSize: number): number {
+  if (empirical === null || sampleSize < 200) return model;
+  const blended = model * 0.75 + empirical * 0.25;
+  return Math.max(0.1, Math.min(99.9, parseFloat(blended.toFixed(1))));
+}
+
 // 순위 계산 로직
 function calculateRankings(userResult: any, allResults: any[]) {
   const { gender, total, region, ageGroup } = userResult;
 
   const sameGenderResults = allResults.filter((r: any) => r.gender === gender);
-  const betterCount = sameGenderResults.filter((r: any) => r.total > total).length;
-  const national = Math.max(0.1, parseFloat(((betterCount / Math.max(1, sameGenderResults.length)) * 100).toFixed(1)));
+  const model = modelPercentile(total, ageGroup);
+  const national = stabilizePercentile(
+    empiricalPercentile(total, sameGenderResults),
+    model,
+    sameGenderResults.length,
+  );
 
   let regionalPercentile = null;
   if (region) {
     const sameRegionResults = sameGenderResults.filter((r: any) => r.region === region);
-    const betterRegionCount = sameRegionResults.filter((r: any) => r.total > total).length;
-    regionalPercentile = sameRegionResults.length > 0
-      ? Math.max(0.1, parseFloat(((betterRegionCount / sameRegionResults.length) * 100).toFixed(1)))
-      : national;
+    regionalPercentile = stabilizePercentile(
+      empiricalPercentile(total, sameRegionResults),
+      national,
+      sameRegionResults.length,
+    );
   }
 
   let agePercentile = null;
   if (ageGroup) {
     const sameAgeResults = sameGenderResults.filter((r: any) => r.ageGroup === ageGroup);
-    const betterAgeCount = sameAgeResults.filter((r: any) => r.total > total).length;
-    agePercentile = sameAgeResults.length > 0
-      ? Math.max(0.1, parseFloat(((betterAgeCount / sameAgeResults.length) * 100).toFixed(1)))
-      : national;
+    agePercentile = stabilizePercentile(
+      empiricalPercentile(total, sameAgeResults),
+      model,
+      sameAgeResults.length,
+    );
   }
 
   return {
