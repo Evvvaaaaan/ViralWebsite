@@ -8,6 +8,14 @@
   ],
   "rewrites": [
     {
+      "source": "/colorvote",
+      "destination": "https://colorvote.vercel.app/colorvote"
+    },
+    {
+      "source": "/colorvote/:path*",
+      "destination": "https://colorvote.vercel.app/colorvote/:path*"
+    },
+    {
       "source": "/percentme",
       "destination": "/index.html"
     },
